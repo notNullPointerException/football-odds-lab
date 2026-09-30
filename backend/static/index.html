@@ -1,0 +1,2007 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Football · 预测台</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a3040;
+    --fg:#e6e9ef; --dim:#8b93a5; --dim2:#5d6678;
+    --acc:#4a9eff; --ok:#2ecc71; --bad:#ff5f6d; --warn:#ffb020;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  code,.num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  header{
+    position:sticky;top:0;z-index:20;background:rgba(15,17,21,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+    padding:10px 18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  }
+  h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.3px}
+  nav{display:flex;gap:6px}
+  nav button{
+    background:transparent;border:1px solid transparent;color:var(--dim);
+    padding:5px 13px;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;
+  }
+  nav button:hover{color:var(--fg);background:var(--panel2)}
+  nav button.on{background:var(--panel2);color:var(--fg);border-color:var(--line)}
+  main{max-width:1180px;margin:0 auto;padding:18px}
+  .bar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  }
+  .bar label{color:var(--dim);font-size:12px}
+  input,select,button{font-family:inherit;font-size:13px}
+  input[type=number],input[type=date],input[type=text],select{
+    background:var(--bg);border:1px solid var(--line);color:var(--fg);
+    padding:6px 9px;border-radius:7px;outline:none;
+  }
+  input:focus,select:focus{border-color:var(--acc)}
+  .bad-input{border-color:var(--bad) !important;animation:shake .3s}
+  @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+  input[type=number]{width:130px}
+  button.act{
+    background:var(--acc);border:1px solid var(--acc);color:#04121f;
+    padding:7px 16px;border-radius:7px;cursor:pointer;font-weight:600;
+  }
+  button.act:hover{filter:brightness(1.1)}
+  button.act:disabled{opacity:.45;cursor:not-allowed;filter:none}
+  button.ghost{
+    background:transparent;border:1px solid var(--line);color:var(--dim);
+    padding:6px 12px;border-radius:7px;cursor:pointer;
+  }
+  button.ghost:hover:not(:disabled){color:var(--fg);border-color:var(--dim2)}
+  button.ghost:disabled{opacity:.35;cursor:not-allowed}
+  .hint{color:var(--dim2);font-size:12px}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    margin-top:12px;overflow:hidden;
+  }
+  .card>.hd{
+    padding:11px 14px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .card>.bd{padding:14px}
+  .vs{font-size:15px;font-weight:600}
+  .teams{display:flex;align-items:center;gap:9px}
+  .teams img{width:22px;height:22px;object-fit:contain}
+  .tag{
+    font-size:11px;padding:1px 7px;border-radius:5px;
+    background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+  }
+  .tag.acc{color:var(--acc);border-color:rgba(74,158,255,.35)}
+  .tag.ok{color:var(--ok);border-color:rgba(46,204,113,.35)}
+  .tag.bad{color:var(--bad);border-color:rgba(255,95,109,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+  .blk{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px}
+  .blk>h3{
+    margin:0 0 10px;font-size:11px;color:var(--dim);font-weight:600;
+    letter-spacing:1.1px;text-transform:uppercase;
+  }
+  .row{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
+  .row .k{color:var(--dim);font-size:13px}
+  .row .v{font-size:13px;font-weight:500}
+  .probs{display:flex;gap:6px;margin:2px 0 10px}
+  .prob{
+    flex:1;background:var(--bg);border:1px solid var(--line);border-radius:7px;
+    padding:8px 6px;text-align:center;
+  }
+  .prob .lbl{font-size:11px;color:var(--dim);display:block;margin-bottom:2px}
+  .prob .val{font-size:16px;font-weight:600}
+  .prob.top{border-color:var(--acc);background:rgba(74,158,255,.08)}
+  .prob.top .val{color:var(--acc)}
+  .prose{color:#c8cedb;font-size:13px;white-space:pre-wrap;word-break:break-word}
+  .prose+.prose{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+  .prose b{color:var(--dim);font-weight:600;font-size:11px;display:block;margin-bottom:2px;letter-spacing:.5px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}
+  th{color:var(--dim);font-weight:500;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+  tbody tr:hover{background:var(--panel2)}
+  .r{text-align:right}
+  .c{text-align:center}
+  .days{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
+  .days button{
+    background:var(--panel);border:1px solid var(--line);color:var(--dim);
+    padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;
+  }
+  .days button:hover{color:var(--fg)}
+  .days button.on{background:var(--panel2);color:var(--fg);border-color:var(--acc)}
+  .days button b{color:var(--fg);font-weight:600}
+  .days button.on b{color:var(--acc)}
+  /* 体彩表格：赔率小字、去水概率大字（看盘看的是概率） */
+  .odds{display:flex;gap:14px;flex-wrap:wrap}
+  .odd{min-width:74px}
+  .odd .o-raw{color:var(--dim2);font-size:11px;line-height:1.3}
+  .odd .o-p{font-size:14px;font-weight:600;line-height:1.35}
+  .odd .o-k{font-size:10px;color:var(--dim);letter-spacing:.5px}
+  /* 庄家盘列（胜负彩页）：故意比体彩那列【弱一档】——
+     体彩才是你真正能下的价，庄家盘是拿来对价的参照物。 */
+  .odds.book .odd{min-width:62px}
+  .odds.book .odd .o-p{font-size:13px;font-weight:500;color:var(--dim)}
+  .bk{font-size:10px;color:var(--dim2);letter-spacing:.3px;margin-bottom:3px}
+  /* 水 = 庄家去水 − 体彩去水（百分点）。正 = 体彩把这一项赔率给高了 = 有价值。
+     字号压到最小：它是参照，不是结论（两边拉取时刻不同，1~2pp 是噪声）。 */
+  .edge{font-size:11px;color:var(--dim2);margin-top:4px;letter-spacing:.3px}
+  .edge b{font-weight:600;margin-right:6px}
+  .edge b.pos{color:#3ecf8e}
+  .edge b.neg{color:var(--dim2)}
+
+  /* ---- 胜负彩「接口预测」列 ----
+     三行：模型首选 / LLM 首选 / LLM 比分。三头不一致时把 LLM 那行标红 ——
+     「三头一致」是这批里唯一验证过有正收益的开口条件，不一致必须一眼看见。 */
+  .pd{font-size:12px;line-height:1.5;white-space:nowrap}
+  .pd .pd-d{font-weight:600}
+  .pd .pd-d.home{color:#ff9f6b}
+  .pd .pd-d.draw{color:var(--dim)}
+  .pd .pd-d.away{color:#5fa8ff}
+  .pd .num{color:var(--dim);font-weight:500}
+  .pd .pd-l{color:var(--dim)}
+  .pd .pd-l b{color:var(--fg);font-weight:600}
+  .pd .pd-l.dis b{color:var(--warn)}
+  .pd .pd-s{color:var(--dim2);font-size:11px}
+  .pd .pd-at{color:var(--dim2);font-size:10px}
+  /* 转圈圈：纯 CSS 画，不用字符 —— 字符版（|/-\）宽度会跳，这一格会跟着抖 */
+  .spin{
+    display:inline-block;width:14px;height:14px;vertical-align:-2px;
+    border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---- 胜负彩「每期复盘」（历史页 分类=胜负14场）----
+     一期一卡：头级条 → 复盘要点 → 14 场明细。 */
+  .rev .rh{display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;
+           font-size:13px;color:var(--dim);margin-bottom:2px}
+  .rev .rh .iss{font-weight:700;color:var(--fg);font-size:15px}
+  /* 奖金 / 中奖注数 / 本期销量。有几档画几档 —— 档数不是恒定的，见 sfcPrizeRow 的注释 */
+  .rev .prow{display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;
+             font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .rev .prow .pz b{color:var(--fg);margin-right:3px}
+  .rev h4{margin:14px 0 7px;font-size:12px;color:var(--dim);font-weight:600;letter-spacing:.5px}
+  .rev ul{margin:0;padding-left:18px}
+  .rev li{font-size:12.5px;color:var(--dim);line-height:1.8}
+  .rev li.warn{color:var(--warn)}
+  /* 头级条：errorbar 由后端算好，这里只按 acc 挑出最准/最差描边 —— 前端不重算口径 */
+  .heads{display:flex;gap:10px;flex-wrap:wrap}
+  .heads .h{border:1px solid var(--line);border-radius:8px;padding:6px 11px;min-width:92px}
+  .heads .h .k{font-size:11px;color:var(--dim2);letter-spacing:.3px;margin-bottom:2px}
+  .heads .h .v{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+  .heads .h .v .sub{font-size:10px;font-weight:400;color:var(--dim2);margin-left:4px}
+  .heads .h.best{border-color:rgba(46,204,113,.45)}
+  .heads .h.best .v{color:var(--ok)}
+  .heads .h.worst{border-color:rgba(255,95,109,.45)}
+  .heads .h.worst .v{color:var(--bad)}
+  /* 明细里每格的对错：✓/✗ 用 ::after 加，不占格宽也就不会把表挤歪 */
+  .pk{font-weight:600;white-space:nowrap}
+  .pk.home{color:#ff9f6b}.pk.draw{color:var(--dim)}.pk.away{color:#5fa8ff}
+  .pk.hit::after{content:"✓";color:var(--ok);font-size:10px;margin-left:2px}
+  .pk.miss::after{content:"✗";color:var(--bad);font-size:10px;margin-left:2px}
+  .pk.none{color:var(--dim2);font-weight:400}
+  .hind{color:var(--dim);font-size:12px}
+  .hind b{color:var(--fg);font-weight:600}
+  .mnum{font-weight:600;color:var(--acc);white-space:nowrap}
+  /* 编号下面那行 fixture_id。比编号弱一档但要是【实打实的数字】，
+     方便和预测接口 / 别的工具里的 id 对上；编不出来时显示「–」，不猜。 */
+  .fid{font-size:11px;font-weight:400;color:var(--dim);letter-spacing:.3px}
+  .fid.none{color:var(--dim2)}
+  .off{color:var(--dim2);font-size:12px}
+  /* 停售 / 截止 —— 整页最该被看见的东西，红色大字。两个盘口页共用。 */
+  .dl{display:flex;gap:26px;flex-wrap:wrap;margin:14px 0 4px;padding:12px 16px;
+      background:rgba(255,95,109,.07);border:1px solid rgba(255,95,109,.28);border-radius:10px}
+  .dl .item{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .dl .k{font-size:11px;color:var(--dim);letter-spacing:.5px;white-space:nowrap}
+  .dl .v{font-size:26px;font-weight:700;line-height:1.15;color:var(--bad);
+         font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  .dl .sub{font-size:12px;color:var(--dim2)}
+  .dl.done{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.10)}
+  .dl.done .v{color:var(--dim2)}      /* 已过期就不再喊红，免得误导 */
+  .empty,.loading{padding:40px 16px;text-align:center;color:var(--dim)}
+  .err{
+    margin-top:12px;background:rgba(255,95,109,.08);border:1px solid rgba(255,95,109,.35);
+    color:#ffb3b9;border-radius:9px;padding:12px 14px;font-size:13px;white-space:pre-wrap;
+  }
+  .pager{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+  .pager .info{color:var(--dim);font-size:12px;margin-right:4px}
+  .pager button.cur{background:var(--acc);color:#04121f;border-color:var(--acc);font-weight:600}
+  details{margin-top:12px}
+  summary{cursor:pointer;color:var(--dim);font-size:12px;user-select:none}
+  summary:hover{color:var(--fg)}
+  pre{
+    background:#0a0c10;border:1px solid var(--line);border-radius:8px;padding:12px;
+    overflow:auto;max-height:460px;font-size:12px;margin:10px 0 0;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  .trunc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  a.small{color:var(--acc);font-size:12px;cursor:pointer;text-decoration:none}
+  a.small:hover{text-decoration:underline}
+
+  /* ---- 接口返回详情浮层（点胜负彩的「接口预测」格展开）----
+     静止状态【不占位也不改外观】：浮层是 body 下一个独立元素，格子只多一个
+     data-detail 属性 + 悬停底色当提示，不点开时页面跟以前一模一样。 */
+  .pd-cell[data-detail]{cursor:pointer}
+  .pd-cell[data-detail]:hover{background:rgba(255,255,255,.045)}
+  #sfc-pop{
+    position:fixed;left:0;top:0;z-index:900;display:none;
+    background:#12151b;border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 14px 44px rgba(0,0,0,.62);
+    width:min(720px,92vw);max-height:min(72vh,640px);
+  }
+  #sfc-pop.on{display:flex;flex-direction:column}
+  #sfc-pop .ph{
+    display:flex;align-items:center;gap:10px;padding:9px 12px;flex:0 0 auto;
+    border-bottom:1px solid var(--line);
+  }
+  #sfc-pop .ph .t{
+    flex:1 1 auto;min-width:0;font-size:12px;color:var(--dim);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  #sfc-pop .ph .t b{color:var(--fg);font-weight:600}
+  #sfc-pop .px{
+    flex:0 0 auto;background:none;border:0;color:var(--dim);font-size:18px;
+    line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px;
+  }
+  #sfc-pop .px:hover{color:var(--fg);background:rgba(255,255,255,.07)}
+  #sfc-pop .pb{flex:1 1 auto;overflow:auto;padding:6px 0 8px}
+  #sfc-pop table{width:100%;border-collapse:collapse;font-size:12px}
+  #sfc-pop td{padding:3px 14px;vertical-align:top;border:0;word-break:break-word;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  #sfc-pop td.k{color:var(--dim);width:1%;white-space:nowrap}
+  /* pre-wrap：伤停/首发是多行文本（一行一个球员），不保留换行会被压成一整条。
+     td.k 是 nowrap 的列名，只有值列需要。 */
+  #sfc-pop td.v{color:var(--fg);white-space:pre-wrap}
+  #sfc-pop .pb details{margin:10px 14px 0}
+  #sfc-pop .pb pre{max-height:280px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI Football · 预测台</h1>
+  <nav>
+    <button data-tab="jc" class="on">体彩</button>
+    <button data-tab="sfc">胜负14场</button>
+    <button data-tab="predict">预测</button>
+    <button data-tab="history">历史预测</button>
+  </nav>
+  <span class="hint" id="net" style="margin-left:auto"></span>
+</header>
+
+<main>
+  <!-- ============ 体彩（实时，默认页） ============ -->
+  <section id="tab-jc">
+    <div class="bar">
+      <span class="hint" id="jc-meta">加载中 …</span>
+      <span style="margin-left:auto"></span>
+      <button class="act" id="jc-refresh">刷新</button>
+    </div>
+    <div class="dl" id="jc-dl"></div>
+    <div class="days" id="jc-days"></div>
+    <div id="jc-out"></div>
+  </section>
+
+  <!-- ============ 胜负彩 14 场（实时） ============ -->
+  <section id="tab-sfc" hidden>
+    <div class="bar">
+      <span class="hint" id="sfc-meta">加载中 …</span>
+      <span style="margin-left:auto"></span>
+      <button class="act" id="sfc-run"
+        title="对本期 14 场并行调 POST /api/predict/{id}，跑完自动写回各自的格子；约 30~60 秒">跑 14 场预测</button>
+      <button class="act" id="sfc-archive"
+        title="把本期 14 场 + 赛前预测快照存进库，开奖后在「历史」页的【分类=胜负14场】看复盘。打开本页时会自动存一次，这个按钮是手动补一炮">存档本期</button>
+      <button class="act" id="sfc-refresh">刷新</button>
+    </div>
+    <div class="dl" id="sfc-dl">
+      <div class="item">
+        <span class="k">⏰ 整期停售</span>
+        <span class="v" id="sfc-dl-time">–</span>
+        <span class="sub" id="sfc-dl-sub"></span>
+      </div>
+    </div>
+    <div id="sfc-out"></div>
+  </section>
+
+  <!-- ============ 预测 ============ -->
+  <section id="tab-predict">
+    <div class="bar">
+      <label for="fid">fixture_id</label>
+      <input id="fid" type="number" placeholder="如 1570390" autocomplete="off">
+      <button class="act" id="run">开始预测</button>
+      <span class="hint">POST /api/predict/{id} — 跑 XGB + 拉伤停首发 + 调 LLM，约 30~60 秒，完成后写入 predictions 表</span>
+    </div>
+    <div id="predict-out"></div>
+  </section>
+
+  <!-- ============ 历史 ============ -->
+  <section id="tab-history" hidden>
+    <div class="bar">
+      <label for="h-date">批次日</label>
+      <input id="h-date" type="date" title="按批次日筛选：当天 10:10 至次日 10:10 算一批（与体彩销售日口径一致）。凌晨开球的比赛归属前一天批次。">
+      <label for="h-cat">分类</label>
+      <select id="h-cat" title="竞彩=按场次的预测记录；胜负14场=按期号的一期一卡复盘（另一套接口 /api/sfc/issues）">
+        <option value="">全部</option>
+        <option value="jingzu">竞彩 jingzu</option>
+        <option value="sfc14">胜负14场</option>
+      </select>
+      <label for="h-size">每页</label>
+      <select id="h-size">
+        <option>10</option><option selected>20</option><option>50</option><option>100</option>
+      </select>
+      <button class="act" id="h-search">查询</button>
+      <button class="ghost" id="h-reset">重置</button>
+      <span class="hint" id="h-total"></span>
+      <span class="hint" style="flex-basis:100%">批次日 = 当天 10:10 至次日 10:10（与体彩销售日同口径）；凌晨开球的比赛归前一天批次。</span>
+    </div>
+    <div id="history-out"></div>
+    <div class="pager" id="h-pager"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* ---------------- 小工具 ---------------- */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+/* 体彩给的都是北京时间字符串（"2026-09-18 22:00:00"），本机 TZ 就是 Asia/Shanghai，
+   所以直接按本地时间解析即可。解析不出来返回 null，调用方据此降级而不是显示 NaN。 */
+const toTs = s => {
+  const t = new Date(String(s ?? "").replace(" ", "T")).getTime();
+  return isNaN(t) ? null : t;
+};
+
+const pct = (v, d = 1) =>
+  (v === null || v === undefined || isNaN(v)) ? "–" : (v * 100).toFixed(d) + "%";
+
+const fnum = (v, d = 2) =>
+  (v === null || v === undefined || isNaN(v)) ? "–" : Number(v).toFixed(d);
+
+// "2026-09-18T03:30:00" -> "09-18 03:30"
+// ⚠️ 兜底分支必须 esc()：这个函数是唯一被直接插进 HTML 的「格式化器」，
+// 若原样返回入参，就等于在渲染路径上开了一条不转义的缝。
+function fmtDate(s) {
+  if (!s) return "–";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  return m ? `${m[2]}-${m[3]} ${m[4]}:${m[5]}` : esc(String(s));
+}
+
+/* 把接口给的时间串解析成 Date。
+   刻意和 fmtDate 用【同一套字面量解析】—— 页面上显示的「09-20 21:00」是按字面量
+   当地时钟画的，那「已开赛几分钟」也必须按同一个时钟算，否则一个走 UTC
+   一个走本地，会算出和页面自相矛盾的分钟数。 */
+function parseLocal(s) {
+  const str = String(s || "").trim();
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  // 明确写了时区（Z / +08:00）就交给 Date 按那个时区解；没写才按字面量当地时钟解。
+  // 接口给的是不带时区的墙上时间，但万一哪天带上，静默按本地读会整整差一个时区 ——
+  // 那种错不会报错，只会让「已开赛几分钟」算出一个看着合理的错数。
+  if (/[Zz]$|[+-]\d{2}:?\d{2}$/.test(str)) return new Date(str);
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+}
+
+// 1 / 0 / null -> 对错符号
+const mark = v => v === 1 ? '<span style="color:var(--ok)">✓</span>'
+              : v === 0 ? '<span style="color:var(--bad)">✗</span>'
+              : '<span style="color:var(--dim2)">–</span>';
+
+/* ---------------- 请求封装 ---------------- */
+async function api(path, opts) {
+  const t0 = performance.now();
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch (e) {
+    throw new Error(`网络错误：${e.message}`);
+  }
+  const ms = Math.round(performance.now() - t0);
+  const text = await res.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = text; }
+
+  if (!res.ok) {
+    const raw = (body && body.detail) ? body.detail : String(text).slice(0, 300);
+    // detail 不一定是字符串（FastAPI 的参数校验错误是数组）——直接塞进模板串会变成
+    // "[object Object]"，所以先归一成字符串再拼。
+    const detail = typeof raw === "string" ? raw : JSON.stringify(raw);
+    const err = new Error(`HTTP ${res.status} · ${detail}`);
+    err.status = res.status; err.ms = ms; err.body = body;
+    err.detail = raw;   // 原样的 detail，给页面直接用，不用从 "HTTP 502 · xxx" 里抠
+    throw err;
+  }
+  return { body, ms, status: res.status };
+}
+
+function showNet(txt) { $("#net").textContent = txt; }
+
+/* ---------------- 两个接口返回结构的归一化 ----------------
+   /api/predict/{id}  -> 扁平 {win_home,.., top3, llm:{}, model_group}
+   /api/predictions   -> 分块 {basic:{}, xgb:{}, llm:{}, result:{}}
+   统一成后者的形状，渲染器只写一套。                              */
+function normalizePredict(r, fixture) {
+  const f = fixture || {};
+  return {
+    basic: {
+      fixture_id:    f.id ?? null,
+      home_name:     f.home_name ?? null,
+      away_name:     f.away_name ?? null,
+      home_logo:     f.home_logo ?? null,
+      away_logo:     f.away_logo ?? null,
+      league_name:   f.league_name ?? null,
+      match_date:    f.date ?? null,
+      status_short:  f.status_short ?? null,
+      category:      f.category ?? null,
+    },
+    xgb: {
+      model_group: r.model_group ?? null,
+      prob: { home: r.win_home, draw: r.win_draw, away: r.win_away },
+      over25: (r.over25_prob === null || r.over25_prob === undefined)
+        ? null : { over: r.over25_prob, under: 1 - r.over25_prob },
+      lambda: (r.lambda_home === null || r.lambda_home === undefined)
+        ? null : { home: r.lambda_home, away: r.lambda_away },
+      top3: r.top3 || null,
+      handicap: r.handicap || null,
+    },
+    llm: r.llm || null,
+    result: (f.goals_home === null || f.goals_home === undefined) ? null : {
+      score: `${f.goals_home}-${f.goals_away}`,
+      win_correct: null, over25_correct: null, handicap_correct: null, top3_correct: null,
+    },
+  };
+}
+
+/* ---------------- LLM 字段显示兜底 ----------------
+   历史接口给的是格式化好的 llm_handicap / llm_over_under；
+   实时预测接口只给原始 handicap_num / ou_line，这里补一个格式化。 */
+function hcText(llm) {
+  if (!llm) return "–";
+  if (llm.handicap) return llm.handicap;
+  const n = parseFloat(llm.handicap_num);
+  if (isNaN(n)) return "–";
+  if (n === 0) return "平手盘";
+  return `${llm.handicap_team || ""}让${Math.abs(n)}球`.trim();
+}
+function ouText(llm) {
+  if (!llm) return "–";
+  if (llm.over_under) return llm.over_under;
+  const t = `${llm.ou_type || ""} ${llm.ou_line || ""}`.trim();
+  return t || "–";
+}
+
+/* ---------------- 单条预测的渲染 ---------------- */
+/* 赛果那一行。
+   🔴 最容易搞错的一点：接口的 result 不是「赛果」，是 fixtures 表的【当前比分】
+   （predictions.py:83 就是 f.goals_home AS actual_h）。进行中的比赛它已经有值了，
+   而 win_correct 那几个对错位来自 predictions 表、要等赛后回填才有。
+   →【绝不能拿 r 在不在判断比赛结束没有】：曼城第 13 分钟 1-1 时
+     r = {score:"1-1", win_correct:null, ...} 是【真值】，照 r 显示就写成
+     「赛果 1-1」，等于把直播比分当终场比分报出去。
+
+   所以下面一切都以 status_short 为准，r 只决定「显示什么内容」：
+     已终止态 → 有比分才叫赛果，没比分说「待回填」
+     进行中态 → 显示比分但必须标明是当前比分，且不给对错位（那一刻没有意义）
+     NS/未知  → 状态源本身可能旧了（fixture_live 停过，全场卡在 NS），
+                用开球时间兜底：比赛不会凭空消失，过点就是开了。拿不到就说不清。
+   宁可说「没同步」，也不编一个听起来完整的假象。 */
+function resultBar(b, r) {
+  const st = (b.status_short || "").toUpperCase();
+  const score = r && r.score ? esc(r.score) : null;
+
+  // 与后端 prediction_result_service.FINISHED 保持同一套口径
+  if (["FT", "AET", "PEN", "AWD", "WO"].includes(st))
+    return score
+      ? `<span class="tag ${r.win_correct === 1 ? "ok" : r.win_correct === 0 ? "bad" : ""}">赛果 ${score}</span>
+         <span class="hint">胜平负 ${mark(r.win_correct)} · 大小球 ${mark(r.over25_correct)} ·
+           让球 ${mark(r.handicap_correct)} · 比分进前三 ${mark(r.top3_correct)}</span>`
+      : `<span class="tag ok">已结束 · 赛果待回填</span>`;
+
+  if (["PST", "CANC", "ABD"].includes(st))
+    return `<span class="tag">${esc(st)} · 未正常进行</span>`;
+
+  if (["1H", "2H", "HT", "ET", "BT", "P", "LIVE", "INT", "SUSP"].includes(st))
+    return `<span class="tag acc">进行中${score ? ` ${score}` : ""}</span>
+            <span class="hint">${score ? "当前比分，非终场 · " : ""}对错待赛后回填</span>`;
+
+  // 走到这儿 = NS 或状态未知，只能靠开球时间判。
+  // 注意下面每一条都【不会】因为时间过了就把比分叫「赛果」——状态源没确认终场，
+  // 我们就没有终场可言，只能如实标成「当前比分」并说明状态源是旧的。
+  const stale = `<span class="hint">状态源仍报「未开赛」，是同步没跟上</span>`;
+  const ko = parseLocal(b.match_date);
+  if (!ko) return score
+    ? `<span class="tag acc">比分 ${score}</span><span class="hint">无开球时间，状态未知</span>`
+    : `<span class="tag">无赛果</span>`;
+
+  const mins = Math.floor((Date.now() - ko.getTime()) / 60000);
+  if (mins < 0) return `<span class="tag">未开赛</span>`;
+  // 一场球连补时也就两小时出头，超过就按已结束说 —— 但仍然不叫它「赛果」
+  if (mins >= 150) return score
+    ? `<span class="tag ok">已结束 · ${score}</span><span class="hint">状态源未更新，对错待回填</span>`
+    : `<span class="tag ok">已结束 · 赛果待回填</span>`;
+  return `<span class="tag acc">已开赛 ${mins} 分钟${score ? ` · ${score}` : " · 比分未同步"}</span>${stale}`;
+}
+
+function renderRecord(d, opts = {}) {
+  const b = d.basic || {}, x = d.xgb || {}, l = d.llm || {}, r = d.result;
+  const p = x.prob || {};
+
+  const top = Math.max(p.home ?? -1, p.draw ?? -1, p.away ?? -1);
+  const cls = v => (v === top ? "prob top" : "prob");
+
+  const teams = (b.home_name || b.away_name)
+    ? `<div class="teams">
+         ${b.home_logo ? `<img src="${esc(b.home_logo)}" alt="">` : ""}
+         <span class="vs">${esc(b.home_name || "?")}</span>
+         <span style="color:var(--dim2)">vs</span>
+         <span class="vs">${esc(b.away_name || "?")}</span>
+         ${b.away_logo ? `<img src="${esc(b.away_logo)}" alt="">` : ""}
+       </div>`
+    : "";
+
+  const meta = [
+    b.league_name ? `<span class="tag acc">${esc(b.league_name)}</span>` : "",
+    b.status_short ? `<span class="tag">${esc(b.status_short)}</span>` : "",
+    b.category ? `<span class="tag">${esc(b.category)}</span>` : "",
+    x.model_group ? `<span class="tag">${esc(x.model_group)}</span>` : "",
+    b.match_date ? `<span class="hint">${fmtDate(b.match_date)}</span>` : "",
+    b.fixture_id ? `<span class="hint code">#${esc(b.fixture_id)}</span>` : "",
+  ].join("");
+
+  const resultHtml = resultBar(b, r);
+
+  // Array.isArray 兜底：predictions.py 的 top3_scores 解析失败时会留成字符串，
+  // 此时 (x.top3 || []).map 会抛，整页变成「加载失败」而不是只丢这一格
+  const top3 = (Array.isArray(x.top3) ? x.top3 : [])
+    .map(t => `<span class="tag">${esc(t.score)} ${pct(t.prob)}</span>`).join(" ");
+
+  const body = `
+    <div class="grid">
+      <div class="blk">
+        <h3>XGBoost 模型</h3>
+        <div class="probs">
+          <div class="${cls(p.home)}"><span class="lbl">主胜</span><span class="val num">${pct(p.home)}</span></div>
+          <div class="${cls(p.draw)}"><span class="lbl">平局</span><span class="val num">${pct(p.draw)}</span></div>
+          <div class="${cls(p.away)}"><span class="lbl">客胜</span><span class="val num">${pct(p.away)}</span></div>
+        </div>
+        <div class="row"><span class="k">大小球 2.5</span>
+          <span class="v num">${x.over25 ? `大 ${pct(x.over25.over)} / 小 ${pct(x.over25.under)}` : "–"}</span></div>
+        <div class="row"><span class="k">预期进球 λ</span>
+          <span class="v num">${x.lambda ? `${fnum(x.lambda.home)} / ${fnum(x.lambda.away)}` : "–"}</span></div>
+        <div class="row"><span class="k">模型让球</span><span class="v">${esc(x.handicap || "–")}</span></div>
+        <div class="row" style="display:block"><span class="k">最可能比分 Top3</span>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${top3 || '<span class="hint">–</span>'}</div></div>
+      </div>
+
+      <div class="blk">
+        <h3>LLM 分析</h3>
+        <div class="row"><span class="k">方向 / 信心</span>
+          <span class="v">${esc(l.win || "–")} <span style="color:var(--acc)">${esc(l.win_pct || "")}</span></span></div>
+        <div class="row"><span class="k">比分</span><span class="v num">${esc(l.score || "–")}</span></div>
+        <div class="row"><span class="k">让球 / 概率</span>
+          <span class="v">${esc(hcText(l))} <span style="color:var(--acc)">${esc(l.handicap_pct || "")}</span></span></div>
+        <div class="row"><span class="k">大小球 / 概率</span>
+          <span class="v">${esc(ouText(l))} <span style="color:var(--acc)">${esc(l.ou_pct || "")}</span></span></div>
+      </div>
+
+      <div class="blk" style="grid-column:1/-1">
+        <h3>LLM 文字</h3>
+        ${l.brief || l.brief_analysis
+          ? `<div class="prose"><b>一句话结论</b>${esc(l.brief || l.brief_analysis)}</div>`
+          : '<div class="hint">无</div>'}
+        ${l.core_data
+          ? `<div class="prose"><b>核心数据</b>${esc(l.core_data)}</div>` : ""}
+        ${l.deep_report
+          ? `<div class="prose"><b>深度分析</b>${esc(l.deep_report)}</div>` : ""}
+      </div>
+    </div>
+
+    ${opts.raw !== undefined
+      ? `<details><summary>原始 JSON 返回</summary><pre>${esc(JSON.stringify(opts.raw, null, 2))}</pre></details>`
+      : ""}
+  `;
+
+  const head = opts.collapsible
+    ? `<summary style="padding:11px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer;list-style:none">
+         ${teams}${meta}${resultHtml}
+       </summary>`
+    : `<div class="hd">${teams}${meta}${resultHtml}</div>`;
+
+  return opts.collapsible
+    ? `<details class="card">${head}<div class="bd">${body}</div></details>`
+    : `<div class="card">${head}<div class="bd">${body}</div></div>`;
+}
+
+/* ---------------- Tab 切换 ---------------- */
+function switchTab(name) {
+  $$("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  $("#tab-jc").hidden      = name !== "jc";
+  $("#tab-sfc").hidden     = name !== "sfc";
+  $("#tab-predict").hidden = name !== "predict";
+  $("#tab-history").hidden = name !== "history";
+  if (name === "jc" && !jc.loaded) loadJc(false);
+  if (name === "sfc" && !sfc.loaded) loadSfc(false);
+  if (name === "history" && !state.loaded) loadHistory(1);
+}
+$$("nav button").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+
+// 把某个 fixture 载入预测页（体彩页和预测历史页共用）
+function loadIntoPredict(fid) {
+  $("#fid").value = fid;
+  switchTab("predict");
+  $("#predict-out").innerHTML =
+    `<div class="hint" style="margin-top:12px">已载入 fixture <span class="num">${esc(fid)}</span>，点「开始预测」重新跑。</div>`;
+}
+
+/* ---------------- 体彩实时盘口（唯一数据源：体彩官方接口） ----------------
+   口径：体彩挂几场就显示几场，不筛选、不排序、不推断。                */
+const jc = { loaded: false, day: 0, payload: null, inflight: false };
+
+async function loadJc(force) {
+  // 上游挂掉时 jc.loaded 一直是 false，来回切 tab 会每次都新起一个请求，
+  // 各自占着一个 asyncio 线程池槽最长 20s。用在途锁挡住堆积。
+  if (jc.inflight) return;
+  const out = $("#jc-out");
+  const meta = $("#jc-meta");
+  jc.inflight = true;
+  $("#jc-refresh").disabled = true;
+  if (!jc.payload) out.innerHTML = `<div class="loading">正在拉取体彩实时盘口 …</div>`;
+
+  try {
+    const res = await api(`/api/jc/matches${force ? "?refresh=true" : ""}`);
+    const d = res.body || {};
+    if (!d.days || !d.days.length) {
+      out.innerHTML = `<div class="empty">体彩当前没有挂出的场次</div>`;
+      $("#jc-days").innerHTML = "";      // 清掉上一次的销售日按钮，避免残留下可点
+      $("#jc-dl").innerHTML = "";        // 同理，别让上批的截止时间挂在那里
+      meta.textContent = "体彩无数据";
+      return;
+    }
+    jc.payload = d;
+    jc.loaded = true;
+
+    const stale = d.stale ? " · ⚠ 体彩接口异常，显示上次缓存" :
+                  d.cached ? " · 缓存" : "";
+    meta.innerHTML =
+      `体彩开盘 · 共 <b class="num">${d.total_count}</b> 场 / ${d.days.length} 个销售日` +
+      ` · 官方更新 ${esc(d.last_update || "–")}${stale}` +
+      ` · 本页 ${res.ms}ms`;
+
+    renderJcDays();
+    renderJcMatches();
+  } catch (e) {
+    out.innerHTML = `<div class="err">体彩接口拉取失败\n${esc(e.message)}</div>`;
+    meta.textContent = "体彩接口异常";
+  } finally {
+    jc.inflight = false;              // 提前 return 的路径也会走到这里，锁不会卡死
+    $("#jc-refresh").disabled = false;
+  }
+}
+
+/* 取当前销售日，并把越界的 jc.day 夹回合法区间。
+   体彩销售日会随开售/停售增减（例如某天过后从 3 天缩到 2 天），
+   若此时仍停在旧索引上，两个 render 都会拿到 undefined →
+   整页静默空白且不高亮任何按钮，看起来像「数据没了」。所以这里统一夹紧。 */
+function currentJcDay() {
+  const days = jc.payload?.days || [];
+  if (!days.length) return null;
+  if (!Number.isInteger(jc.day) || jc.day < 0 || jc.day >= days.length) jc.day = 0;
+  return days[jc.day];
+}
+
+function renderJcDays() {
+  currentJcDay();                       // 先夹紧，再决定高亮谁
+  const box = $("#jc-days");
+  const days = jc.payload?.days || [];
+  box.innerHTML = days.map((d, i) =>
+    `<button data-d="${i}" class="${i === jc.day ? "on" : ""}">
+       ${esc(d.weekday)} <b class="num">${esc(d.business_date)}</b>
+       <span class="hint">${d.count} 场</span>
+     </button>`).join("");
+  $$("button[data-d]", box).forEach(b => b.onclick = () => {
+    jc.day = parseInt(b.dataset.d, 10);
+    renderJcDays();
+    renderJcMatches();
+  });
+}
+
+// 一个玩法池 -> 三列。labels 形如 [["主胜","p_h","h"], ...]
+// muted=true 是庄家盘那列：同结构但整体弱一档（见 .odds.book）
+function oddsCells(pool, labels, muted) {
+  if (!pool) return `<span class="off">未开</span>`;
+  return `<div class="odds${muted ? " book" : ""}">` + labels.map(([label, pKey, rawKey]) =>
+    `<div class="odd">
+       <div class="o-k">${label}</div>
+       <div class="o-p num">${pct(pool[pKey], 1)}</div>
+       <div class="o-raw num">@${esc(pool[rawKey] ?? "–")}</div>
+     </div>`).join("") + `</div>`;
+}
+
+/* 编号下面那行 fixture_id。体彩页 / 胜负彩页共用同一份口径：
+   编得出来就显示数字，编不出来显示「–」——「映射还没建到这一天」
+   是要让人看见的状态，不能留空白让人以为漏渲染了。 */
+function fidLine(m) {
+  return m.fixture_id
+    ? `<div class="fid">#${esc(m.fixture_id)}</div>`
+    : `<div class="fid none">–</div>`;
+}
+
+/* 庄家盘 -> oddsCells() 认的那个池子形状。
+   devig 缺失就现算一次（和竞彩页同一套公式），保证「有赔率就一定有概率」，
+   不会因为后端少存一个字段就整格显示「未开」。 */
+function bookPool(b) {
+  if (!b || b.h == null || b.d == null || b.a == null) return null;
+  let dv = b.devig;
+  // 长度也要查：只有 [p_h, p_a] 两格的 devig 里没有 null，`.some()` 查不出来，
+  // 会静默让 p_a = undefined -> 那一格显示「–」而另外两格正常，很难看出是缺字段。
+  if (!Array.isArray(dv) || dv.length < 3 || dv.some(v => v == null)) {
+    const t = 1 / b.h + 1 / b.d + 1 / b.a;
+    dv = [1 / b.h / t, 1 / b.d / t, 1 / b.a / t];
+  }
+  return { h: b.h, d: b.d, a: b.a, p_h: dv[0], p_d: dv[1], p_a: dv[2] };
+}
+
+/* 庄家盘那一格。胜负彩自己的 h/d/a 只有【体彩开售的场次】才有（26134 期 14 场里 8 场
+   是空的），而庄家盘 13/14 场都有 —— 所以对「体彩还没开盘」的场次，这一列是唯一
+   能看到的行情。
+
+   三种状态必须分开，别都塌成「–」：
+     · 没 book       → 「–」          = 这场还没跑过预测
+     · 有盘但没胜平负 → 庄家名+「仅亚盘」= 跑过了，但庄家没开 1x2（亚盘没有平局，
+                                          和胜负彩的胜平负玩法对不上，不能拿来对价）
+     · 有盘有胜平负   → 正常三列 + 体彩那边给「水」 */
+function bookCell(b) {
+  const pool = bookPool(b);
+  const who = b ? esc(b.bookmaker || "庄家") : "";
+  if (!pool) {
+    // 有盘但凑不出胜平负：要说清是【庄家没开 1x2】还是【字段缺】，
+    // 不能一律写「仅亚盘」—— 那对「有 h/a 没有 d」之外的情况都是假话。
+    if (!b) return `<span class="off">–</span>`;
+    return `<div class="bk">${who} ${b.bet === "ah" ? "仅亚盘" : "无胜平负盘"}</div>`;
+  }
+  // snapshot 是【查 /odds 用的日期参数 = 开球的 UTC 日期】，不是抓取时刻 ——
+  // 不标注清楚的话，它长得就像一个「这盘是哪天的」时间戳，会被读错。
+  const src = who + (b.snapshot
+    ? `<span title="快照=查 api-football /odds 时用的 date 参数，即【开球的 UTC 日期】，不是抓取时刻"
+           > · ${esc(String(b.snapshot).slice(5))}</span>`
+    : "");
+  return `<div class="bk">${src}</div>` +
+    oddsCells(pool, [["主胜","p_h","h"],["平","p_d","d"],["客胜","p_a","a"]], true);
+}
+
+/* ---------------- 胜负彩「接口预测」列 ----------------
+   三头里只画两个：prob 头（首选+概率）和 LLM 头（方向+信心），外加 LLM 比分。
+   λ【故意不画】—— 实测 GLOBAL 组在国家队场次是垃圾（9-26 那批 4 条背离腿
+   全反），画出来只会诱导人拿它当依据。想看的话 title 里有。 */
+const PD_DIR = { home: "主胜", draw: "平局", away: "客胜" };
+
+/* prob 头的首选方向。三个都为空返回 null —— 不能让 max() 去挑 undefined，
+   那会把「没有数据」显示成「主胜」。 */
+function predPick(pred) {
+  const p = (pred && pred.prob) || {};
+  let dir = null, best = -1;
+  for (const d of ["home", "draw", "away"]) {
+    const v = p[d];
+    if (v !== null && v !== undefined && !isNaN(v) && v > best) { best = v; dir = d; }
+  }
+  return dir === null ? null : { dir, prob: best };
+}
+
+/* LLM 的 "主胜"/"客胜"/"平" → home/away/draw。认不出来返回 null（当「无从比对」，
+   不是「不一致」—— 把认不出当分歧会天天报假警报）。 */
+function llmDir(w) {
+  const s = String(w || "");
+  if (s.includes("主")) return "home";
+  if (s.includes("客")) return "away";
+  if (s.includes("平")) return "draw";
+  return null;
+}
+
+function predCell(pred, llm, st) {
+  if (st === "loading") return `<span class="spin" title="正在调用预测接口…"></span>`;
+  if (st) {
+    // st.detail 是后端原样给的原因（api() 挂上去的）——「LLM 未返回完整预测」和
+    // 「联赛没有可用模型」是两回事，别只显示一句「跑失败」让人去翻日志。
+    const why = st.detail ? String(st.detail) : (st.message || String(st));
+    // 用 class="small rerun" 不用 jump：a.jump 在 renderSfc 里被绑成了「跳到预测页」，
+    // 混用会让点「重跑」变成跳页。
+    return `<span class="off" style="color:var(--bad)" title="${esc(why)}">跑失败</span>
+            <a class="small rerun" data-rerun="1" title="只重跑这一场 —— ${esc(why)}">重跑</a>`;
+  }
+  if (!pred) return `<span class="off" title="这场还没跑过预测">未跑</span>`;
+
+  const pk = predPick(pred);
+  const lam = pred.lambda
+    ? `λ ${fnum(pred.lambda.home)}/${fnum(pred.lambda.away)}` : "";
+  const tip = [pred.model_group, lam, pred.handicap, pred.at ? `跑于 ${pred.at}` : ""]
+    .filter(Boolean).join(" · ");
+
+  const top = `<div>` + (pk
+    ? `<span class="pd-d ${pk.dir}">${PD_DIR[pk.dir]}</span>
+       <span class="num">${pct(pk.prob)}</span>`
+    : `<span class="off">无 prob</span>`) + `</div>`;
+
+  // 与模型首选不一致就标红。「三头一致」是这批里唯一验出正收益的开口条件，
+  // 不一致的那格必须一眼看见，不能靠人去比对两行字。
+  const lw = (llm && llm.win) ? String(llm.win) : "";
+  const dis = !!(pk && lw && llmDir(lw) && llmDir(lw) !== pk.dir);
+  const lline = lw
+    ? `<div class="pd-l${dis ? " dis" : ""}"
+         title="${dis ? "LLM 头与模型首选不一致" : ""}">LLM <b>${esc(lw)}</b>${
+         llm.win_pct ? ` <span class="num">${esc(llm.win_pct)}</span>` : ""}${
+         dis ? " 分歧" : ""}</div>`
+    : "";
+  const sline = (llm && llm.score)
+    ? `<div class="pd-s">${esc(llm.score)}</div>` : "";
+
+  return `<div class="pd" title="${esc(tip)}">${top}${lline}${sline}</div>`;
+}
+
+/* 水 = 庄家去水 − 体彩去水（百分点）。
+   正 = 庄家认为这个结果更可能 = 体彩把赔率给高了 = 有价值。
+   ⚠️ 体彩是实时的、庄家盘是【预测那一刻】的快照，两边拉取时刻不同，
+   1~2pp 当噪声看；而且庄家盘是 Pinnacle 的去水，水位本就比体彩低一档，
+   拿它当「公平价」是近似不是定理。所以这一行是参照，不是结论。 */
+function edgeLine(had, b) {
+  // 走 bookPool 而不是直接读 b.devig：devig 的三种坏形态（不是数组 / 长度不足 3 /
+  // 元素为 null）在那里已经兜住了，这里再抄一遍判断迟早会漏一种 —— 漏了的后果是
+  // 相减得 NaN，页面显示「客NaN」，而且因为不抛错，不会有任何提示。
+  // bookPool 为 null（这场没庄家盘）时整行不显示，与「体彩没开盘」时的表现一致。
+  const pool = bookPool(b);
+  if (!had || !pool) return "";
+  const pairs = [["主", had.p_h, pool.p_h], ["平", had.p_d, pool.p_d],
+                 ["客", had.p_a, pool.p_a]];
+  if (pairs.some(([, pj]) => pj == null)) return "";
+  return `<div class="edge">水 ` + pairs.map(([k, pj, pb]) => {
+    const d = (pb - pj) * 100;
+    return `<b class="${d >= 0 ? "pos" : "neg"}">${k}${d >= 0 ? "+" : ""}${d.toFixed(1)}</b>`;
+  }).join("") + `</div>`;
+}
+
+function renderJcMatches() {
+  const out = $("#jc-out");
+  const d = currentJcDay();
+  if (!d) {
+    out.innerHTML = `<div class="empty">体彩当前没有挂出的场次</div>`;
+    paintJcDeadline();          // 无场次时这里会把截止条清空，不能留上一次的
+    return;
+  }
+
+  const rows = (d.matches || []).map(m => {
+    const line = m.hhad
+      ? `<span class="hind">${esc(m.hhad.side)}<b>${Math.abs(m.hhad.line)}</b>球</span>`
+      : "";
+    const upd = m.had?.updated || m.hhad?.updated || "";
+
+    // fixture_id 由后端 jc_match_service 现场解析（9-24 起不再读 jc_map.json）。
+    // 给得出就做成可点入口，直接跳到预测页跑这场；编号下面那行永远显示 id 本身。
+    const numCell = (m.fixture_id
+      ? `<a class="small jump" data-fid="${esc(m.fixture_id)}"
+            title="在「预测」页跑这场">${esc(m.match_num)}</a>`
+      : esc(m.match_num)) + fidLine(m);
+
+    return `<tr>
+      <td class="mnum">${numCell}</td>
+      <td><span class="tag">${esc(m.league)}</span></td>
+      <td>
+        <div style="font-weight:500">${esc(m.home)}
+          <span style="color:var(--dim2)">vs</span> ${esc(m.away)}</div>
+        <div class="hint">${fmtDate(m.kickoff)}${upd ? ` · 更新 ${esc(upd.slice(11) || upd)}` : ""}</div>
+      </td>
+      <td>${oddsCells(m.had, [["主胜","p_h","h"],["平","p_d","d"],["客胜","p_a","a"]])}</td>
+      <td>${oddsCells(m.hhad, [["让胜","p_h","h"],["让平","p_d","d"],["让负","p_a","a"]])}${line}</td>
+    </tr>`;
+  }).join("");
+
+  const offHad = (d.matches || []).filter(m => !m.had).length;
+  const hasLink = (d.matches || []).some(m => m.fixture_id);
+
+  out.innerHTML = `
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>编号 / id</th><th>联赛</th><th>对阵 / 开球</th>
+          <th>胜平负（去水）</th><th>让球胜平负（去水）</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="hint" style="margin-top:10px">
+      ${esc(d.weekday)} ${esc(d.business_date)} 销售日 · 共 <b class="num">${d.count}</b> 场${offHad ? ` · 其中 ${offHad} 场未开胜平负` : ""}
+      · 大字为去水概率，@ 后为体彩原始赔率
+      ${hasLink ? " · 蓝色编号可点，直达「预测」页"
+                : " · id 显示「–」= 队名没认出来（补 teams.name_zh 或写 jc_overrides.json）"}
+    </div>`;
+
+  $$("a.jump", out).forEach(a => a.onclick = ev => {
+    ev.preventDefault();
+    loadIntoPredict(parseInt(a.dataset.fid, 10));
+  });
+
+  paintJcDeadline();
+  startDlTick();
+}
+
+/* 一条「截止」项。m 为空 = 这一档已经没有可下手的场次。 */
+function dlItem(label, m, note) {
+  if (!m) {
+    return `<div class="item">
+              <span class="k">⏰ ${esc(label)}</span>
+              <span class="v">全部已开赛</span>
+              <span class="sub">${esc(note || "")}</span>
+            </div>`;
+  }
+  // 体彩 schema 有 poolCloseTime 就用它，没给（现状全空）才回落到开球时间 ——
+  // 竞彩是逐场卖到开球为止，所以开球时间就是事实上的截止点。
+  const t = m.close_time || m.kickoff;
+  return `<div class="item">
+            <span class="k">⏰ ${esc(label)}${m.close_time ? "" : "（截至开球）"}</span>
+            <span class="v">${fmtDate(t)}</span>
+            <span class="sub">${esc(m.home)} vs ${esc(m.away)} · ${esc(m.match_num)}</span>
+          </div>`;
+}
+
+/* 体彩页的截止条。竞彩【没有整期停售】，是逐场卖到开球，所以给两个口径：
+   「下一场」= 全部销售日里最早一场还没开球的（当下最紧的截止点，全局）
+   「本批最后」= 当前选中销售日的最后一场（这批最晚什么时候还能下手） */
+function paintJcDeadline() {
+  const box = $("#jc-dl");
+  if (!box) return;
+  const days = jc.payload?.days || [];
+  const all = days.flatMap(d => d.matches || []);
+  if (!all.length) { box.innerHTML = ""; return; }
+
+  const now = Date.now();
+  const at = m => toTs(m.close_time || m.kickoff);
+  const next = all.map(m => ({ m, t: at(m) }))
+                  .filter(o => o.t !== null && o.t > now)
+                  .sort((a, b) => a.t - b.t)[0];
+  const cur = currentJcDay();
+  const last = (cur?.matches || []).map(m => ({ m, t: at(m) }))
+                  .filter(o => o.t !== null)
+                  .sort((a, b) => b.t - a.t)[0];
+
+  box.className = "dl" + (next ? "" : " done");
+  box.innerHTML =
+    dlItem("下一场截止", next?.m, "本批全部已开赛") +
+    dlItem("本批最后", last?.m, "本销售日没有可下手的场次");
+}
+
+/* 两个盘口页共用 30s 重算。不重算的话，页面开着不动，
+   「下一场截止」会一直停在打开那一刻的答案上，时间过了还在喊同一场。 */
+let dlTick = null;
+function startDlTick() {
+  if (dlTick) return;                       // 全局只留一个，别攒定时器
+  dlTick = setInterval(() => {
+    if (!$("#tab-jc").hidden)  paintJcDeadline();
+    if (!$("#tab-sfc").hidden) paintSfcDeadline();
+  }, 30000);
+}
+
+$("#jc-refresh").onclick = () => loadJc(true);
+
+/* ---------------- 胜负彩（传统足彩 14 场） ----------------
+   和竞彩是【两个彩种】：玩法只有胜平负、没有让球线，一期固定 14 场。
+   口径同样是「体彩挂几场显示几场」，不筛选不推断。
+   赔率结构后端已对齐成和竞彩一样，所以 oddsCells() 直接复用。       */
+/* st: fixture_id -> "loading" | Error | {pred, llm}
+   跑预测时「哪几场正在跑、跑出来什么」的现场，和 payload 分开存 ——
+   重画表格不能把正在跑的场次打回「未跑」。 */
+// raw：本会话跑过的场次，原样存一份 POST /api/predict/{id} 的【整包响应】。
+// 格子只显示三行，但点开要看全部（含只写库、列表接口都不给的 llm 长文本字段），
+// 归一化过的 np 已经丢了大半字段，所以必须另外留一份原始 body。
+const sfc = { loaded: false, payload: null, inflight: false, tick: null, st: {}, raw: {} };
+
+async function loadSfc(force) {
+  if (sfc.inflight) return;           // 同体彩页：挡住来回切 tab 的请求堆积
+  const out = $("#sfc-out");
+  const meta = $("#sfc-meta");
+  sfc.inflight = true;
+  $("#sfc-refresh").disabled = true;
+  if (!sfc.payload) out.innerHTML = `<div class="loading">正在拉取胜负彩实时数据 …</div>`;
+
+  try {
+    const res = await api(`/api/sfc/matches${force ? "?refresh=true" : ""}`);
+    const d = res.body || {};
+    if (!d.matches || !d.matches.length) {
+      out.innerHTML = `<div class="empty">体彩当前没有挂出的胜负彩场次</div>`;
+      meta.textContent = "胜负彩无数据";
+      // 没场次 = 旧那期的停售倒计时已经不作数了，必须连数据一起清掉。
+      // 🔴 只 hidden 是不够的：30s 的 startDlTick 会拿 sfc.payload 重画，
+      //    过 30 秒它自己又冒出来，看起来像「还在倒计时」。清 payload 才是真的停。
+      sfc.payload = null;
+      $("#sfc-dl").hidden = true;
+      return;
+    }
+    sfc.payload = d;
+    sfc.loaded = true;
+
+    const stale = d.stale ? " · ⚠ 体彩接口异常，显示上次缓存" :
+                  d.cached ? " · 缓存" : "";
+    meta.innerHTML =
+      `胜负彩 第 <b class="num">${esc(d.issue || "–")}</b> 期 · ` +
+      `共 <b class="num">${d.total_count}</b> 场` +
+      (d.sale_end ? ` · 停售 ${fmtDate(d.sale_end)}` : "") +
+      (d.draw_time ? ` · 开奖 ${fmtDate(d.draw_time)}` : "") +
+      `${stale} · 本页 ${res.ms}ms`;
+
+    renderSfc();
+  } catch (e) {
+    out.innerHTML = `<div class="err">胜负彩接口拉取失败\n${esc(e.message)}</div>`;
+    meta.textContent = "胜负彩接口异常";
+  } finally {
+    sfc.inflight = false;
+    $("#sfc-refresh").disabled = false;
+  }
+}
+
+/* 画胜负彩表。两条路（有场次 / 空态）画法不同，但「浮层必须锚在活的格子上」这条规矩
+   只有一条 —— 所以收在一个出口上跑 syncSfcPop。
+   🔴 别再把它写进某条分支的末尾：上一版就写在末尾，而空态那条是 `return` 早退，
+   直接跳过了，结果表格清空后浮层还悬在屏幕上指着已经不存在的格子。
+   （同一个坑我在这页犯过第二次了 —— renderSfc 的「重跑」绑定当初也是这么漏的。） */
+function renderSfc() {
+  renderSfcBody();
+  syncSfcPop();
+}
+
+/* 浮层要么锚在一个还活着的格子上，要么关掉。任何一次重画之后都得过一遍。 */
+function syncSfcPop() {
+  if (sfcPopFid === null) return;
+  const td = $(`#sfc-out tr[data-fid="${sfcPopFid}"] td[data-detail]`);
+  if (!td) { closeSfcPop(); return; }
+  // 数据源换了就重铺内容，没换只挪位置。
+  // 为什么不一律重铺：重铺会把 .pb 的 scrollTop 归零，用户刚滚下去看 deep_report
+  // 就被弹回顶部 —— 而 renderSfc 是刷新按钮 / 跑完一场都会走的。
+  // 指纹用 sfc.raw[fid] 这个【对象引用】：跑完一场它必然换新对象；没跑过的场次
+  // 一直是 undefined → 统一记成 "payload"。列表路径的 d.data 每次都新建，不能拿它当指纹。
+  const key = sfc.raw[sfcPopFid] || "payload";
+  if (key !== sfcPopKey) { openSfcPop(sfcPopFid, td); return; }
+  placeSfcPop(td);
+}
+
+function renderSfcBody() {
+  const out = $("#sfc-out");
+  const d = sfc.payload || {};
+  const ms = d.matches || [];
+  if (!ms.length) {
+    out.innerHTML = `<div class="empty">体彩当前没有挂出的胜负彩场次</div>`;
+    return;
+  }
+
+  const rows = ms.map(m => {
+    // 胜负彩接口不给开球时间，只有日期。能按 matchId 关联到竞彩的才有完整时间，
+    // 关联不上的（那场当期竞彩没开售）如实标「仅日期」，不编也不藏。
+    // slice(5) 是把 "2026-09-29" 砍成 "09-29"。但 match_date 为空时的兜底字符 "–"
+    // 会被一起砍成空串 —— 那一格就整个变空白，看不出是「这场没日期」还是「渲染崩了」。
+    // 先按长度判断再砍，解不出的原样显示。
+    const md = (m.match_date || "").trim();
+    const mdShort = md.length >= 10 ? md.slice(5, 10) : (md || "–");
+    const when = m.kickoff
+      ? `<span class="num">${fmtDate(m.kickoff)}</span>`
+      : `<span class="num">${esc(mdShort)}</span>` +
+        `<span class="off" title="胜负彩接口不提供开球时间，且该场当期竞彩未开售"> · 仅日期</span>`;
+
+    const res = m.result
+      ? `<span class="tag" title="${esc(m.result_label || "")}赛">${esc(m.result)}</span>` +
+        (m.score ? ` <span class="num" style="font-size:12px">${esc(m.score)}</span>` : "")
+      : `<span class="off">未开奖</span>`;
+
+    // fixture_id 与体彩页【同源】：两边都走同一个 jc_match_service（含同一份
+    // overrides）——竞彩场次用开球时间窄窗、竞彩没开售的用日期窗兜底，
+    // 所以同一场比赛在两个页面显示的 id 必然一致。给得出就同样可点直达预测页。
+    const numCell = (m.fixture_id
+      ? `<a class="small jump" data-fid="${esc(m.fixture_id)}"
+            title="在「预测」页跑这场">${esc(m.no)}</a>`
+      : esc(m.no)) + fidLine(m);
+
+    // 接口预测那一格。状态存在 sfc.st 里而不是闭包变量里 —— 页面重画（刷新按钮 /
+    // 切销售日）时正在跑的场次必须继续转圈，不能变回「未跑」。
+    const st = m.fixture_id ? sfc.st[m.fixture_id] : null;
+    const pdCell = m.fixture_id
+      ? predCell(m.pred, m.llm, st)
+      : `<span class="off" title="这场编不出 fixture_id，跑不了预测">–</span>`;
+
+    return `<tr data-fid="${esc(m.fixture_id || "")}">
+      <td class="mnum">${numCell}</td>
+      <td><span class="tag">${esc(m.league)}</span></td>
+      <td>
+        <div style="font-weight:500">${esc(m.home)}
+          <span style="color:var(--dim2)">vs</span> ${esc(m.away)}</div>
+        <div class="hint">${when}</div>
+      </td>
+      <td>${oddsCells(m.had, [["主胜","p_h","h"],["平","p_d","d"],["客胜","p_a","a"]])}
+          ${edgeLine(m.had, m.book)}</td>
+      <td>${bookCell(m.book)}</td>
+      <td class="pd-cell"${m.fixture_id ? ` data-detail="1"` : ""}>${pdCell}</td>
+      <td>${res}</td>
+    </tr>`;
+  }).join("");
+
+  const offHad = ms.filter(m => !m.had).length;
+  const offBook = ms.filter(m => !m.book).length;
+  const bothCnt = ms.filter(m => m.had && m.book).length;
+  const gap = d.total_count - d.kickoff_matched;
+  const hasFid = ms.some(m => m.fixture_id);
+
+  out.innerHTML = `
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>场次 / id</th><th>联赛</th><th>对阵 / 开球</th>
+          <th>体彩胜平负（去水）</th><th>庄家盘（去水）</th>
+          <th>接口预测</th><th>彩果</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="hint" style="margin-top:10px">
+      第 ${esc(d.issue || "–")} 期 ${esc(d.lottery_name || "胜负游戏")} · 共
+      <b class="num">${d.total_count}</b> 场${offHad ? ` · 其中 ${offHad} 场体彩未开赔率` : ""}
+      · 大字为去水概率，@ 后为原始赔率
+      · 彩果 3=主胜 1=平 0=客胜
+      <br>
+      庄家盘 = 预测时落库的盘（<b>Pinnacle 优先</b>，缺了才退 Bet365/Betfair ——
+      具体哪家看格子里的名字），同 <code>/api/predictions</code> 的 market 块同源
+      ${offBook ? ` · ${offBook} 场没有：这些场还没跑过预测` : ""}
+      ${bothCnt ? `<br>「水」= 庄家去水 − 体彩去水（百分点），<b class="num">正数才是体彩给高了</b>；
+        但体彩是实时的、庄家盘是预测那一刻的快照，两边时刻不同，
+        <b>1~2pp 是噪声</b>，别拿小数当信号 —— 它只是参照，不是结论` : ""}
+      <br>
+      接口预测 = 点上面的按钮现场跑的（<code>POST /api/predict/{id}</code>，14 场并行，
+      每场回来就写进它自己那格）。第一行是模型 prob 头的首选 + 概率，第二行是
+      <b>LLM 头</b>，第三行是 LLM 给的比分；
+      <b>两行方向不一致时 LLM 那行标黄</b> —— 「三头一致」才是验过有正收益的开口条件，
+      不一致的别当同一个信号看。λ 只在悬停提示里（GLOBAL 组在国家队场次不可信）。
+      ${gap ? ` · ${gap} 场竞彩当期未开售，体彩不给开球时间，只能显示日期` : ""}
+      ${hasFid ? " · 蓝色场次可点，直达「预测」页"
+               // 后端现在会先走竞彩关联、再走「日期窗 + 队名」兜底，两条都断了
+               // 才是这个名字问题 —— 「竞彩没开售」已经不再是解释（9-28 起）。
+               : " · id 显示「–」= 队名没认出来（补 teams.name_zh 或写 jc_overrides.json）"}
+    </div>`;
+
+  $$("a.jump", out).forEach(a => a.onclick = ev => {
+    ev.preventDefault();
+    loadIntoPredict(parseInt(a.dataset.fid, 10));
+  });
+
+  paintSfcDeadline();
+  startDlTick();
+}
+
+/* 胜负彩和竞彩不同：它【有真正的整期停售】，一期 14 场共用一个截止点，
+   所以这里显示的是体彩给的 lotterySaleEndtime 原值，不是开球时间。 */
+function paintSfcDeadline() {
+  const box = $("#sfc-dl"), tv = $("#sfc-dl-time"), sub = $("#sfc-dl-sub");
+  if (!box || !tv || !sub || !sfc.payload) return;
+  const d = sfc.payload;
+  const end = toTs(d.sale_end);
+  if (end === null) {                      // 体彩没给停售时间就不硬编，整条收起来
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  tv.textContent = fmtDate(d.sale_end);
+
+  const left = end - Date.now();
+  box.classList.toggle("done", left <= 0);  // 已停售就不再喊红，免得误导
+  const h = Math.floor(left / 3600000), mi = Math.floor(left % 3600000 / 60000);
+  sub.textContent = `第 ${d.issue || "–"} 期 ${d.lottery_name || ""}`.trim() +
+    (left <= 0 ? " · 已停售"
+               : h ? ` · 距停售 ${h} 小时 ${mi} 分` : ` · 距停售 ${mi} 分`);
+}
+
+$("#sfc-refresh").onclick = () => loadSfc(true);
+
+/* 格子上的「重跑」在容器上委托一次就够（#sfc-out 本身从不被替换，只换它的 innerHTML）。
+   不放进 renderSfc 里绑：renderSfc 在「没有场次」时会提前 return，绑在函数末尾就会漏绑，
+   而且 patchSfcPred 重写单个格子 innerHTML 时，绑在格子上的 handler 也会跟着丢。 */
+$("#sfc-out").addEventListener("click", ev => {
+  const a = ev.target.closest("a[data-rerun]");
+  if (!a) return;
+  ev.preventDefault();
+  const tr = a.closest("tr[data-fid]");
+  if (tr) rerunOneSfc(parseInt(tr.dataset.fid, 10));
+});
+
+/* ---------------- 接口返回详情浮层 ----------------
+   需求原话：「把接口返回的全部信息通过失焦的方式展示详细的内容，鼠标点上去可以看到全部的内容，
+   鼠标不点上去看到的就是现在的样子」。落到代码上是三条约束：
+     1. 格子的【静止外观一个像素都不改】—— 触发器就是 <td class="pd-cell"> 上那个
+        data-detail 属性（悬停只加一点底色 + pointer 光标当提示），浮层是 body 下的独立元素；
+     2. 点开是【只读展示】，不给它加任何编辑/提交能力，看错东西的风险为零；
+     3. 关掉的方式：点别处 / 点同一格 / Esc / 滚页面 / 改窗口大小 —— 前三种是「失焦」，后两种是
+        位置会失真（浮层是 position:fixed，页面一滚就跟格子错位），直接收掉比重算省事可靠。
+
+   两个数据源，取到哪个显示哪个（标题栏写明来源，别让人以为看到的是同一份）：
+     POST /api/predict/{fid} —— 本会话现场跑的，最全（含 llm 的长文本字段，列表接口不给）
+     GET  /api/sfc/matches   —— 页面加载时列表接口给的 {pred, llm, book} 三块
+   跑过的以 POST 为准（字段更全），没跑过的退回列表块。 */
+const SFC_POP = (() => {
+  // 用 createElement 而不是写进 body 的 HTML：浮层是这一个功能的私有单例，
+  // 跟它的渲染/定位/关闭逻辑放在一起，读的时候不用在 1600 行里两头跳。
+  const el = document.createElement("div");
+  el.id = "sfc-pop";
+  el.innerHTML = `<div class="ph"><span class="t"></span>
+      <button class="px" type="button" title="关闭（Esc）">×</button></div>
+    <div class="pb"></div>`;
+  document.body.appendChild(el);
+  return { el, t: el.querySelector(".t"), b: el.querySelector(".pb") };
+})();
+
+let sfcPopFid = null;      // 当前浮层对着哪一场；null = 没开
+let sfcPopKey = null;      // 铺内容时用的数据指纹，见 syncSfcPop
+
+/* 递归拍平成 [路径, 值] 两列。【不挑字段】：写死字段名迟早会漏掉后端新加的键，
+   而这里要的就是「全部信息」，漏一个就名不副实 —— 所以走通用遍历，后端加字段这里自动就有。
+   用 full.path.leaf 而不是缩进：嵌套最深三四层，写全路径省横向空间，也能直接对照原始 JSON。 */
+function flatRows(v, path, out) {
+  if (v === null || v === undefined) { out.push([path, "—"]); return out; }
+  if (typeof v !== "object") { out.push([path, String(v)]); return out; }
+  if (Array.isArray(v)) {
+    if (!v.length) { out.push([path, "[]"]); return out; }
+    v.forEach((x, i) => flatRows(x, `${path}[${i}]`, out));
+    return out;
+  }
+  const ks = Object.keys(v);
+  if (!ks.length) { out.push([path, "{}"]); return out; }
+  ks.forEach(k => flatRows(v[k], path ? `${path}.${k}` : k, out));
+  return out;
+}
+
+/* 浮层左列原来直接铺 dotted path（result.llm.brief_analysis），一眼看不出这是啥。
+   换成中文名。🔴 查不到就【原样显示路径】—— 这张表是纯增益，不是白名单：
+   后端加字段时它会照旧冒出来（顶多先是英文），绝不会被表静默吃掉；
+   反过来，表里写了后端却已经删掉的字段，也只是永远查不中，不会报错。
+   键里的 [] 是数组下标的占位（result.top3[0].score 查的是 result.top3[].score）。
+   值可以是字符串（{n} 换成 1 起的序号），也可以是数组（按下标取，越界当查不到）。 */
+const SFC_LABEL = {
+  // —— POST /api/predict/{id} 的整包响应 ——
+  "status":                    "状态",
+  "fixture_id":                "比赛 id",
+  "result.model_group":        "模型分组",
+  "result.win_home":           "主胜概率",
+  "result.win_draw":           "平局概率",
+  "result.win_away":           "客胜概率",
+  "result.over25_prob":        "大于 2.5 球概率",
+  "result.lambda_home":        "主队期望进球 λ",
+  "result.lambda_away":        "客队期望进球 λ",
+  "result.handicap":           "让球盘",
+  "result.top3[].score":       "比分榜 {n} · 比分",
+  "result.top3[].prob":        "比分榜 {n} · 概率",
+  "result.llm.win":            "LLM 胜平负",
+  "result.llm.win_pct":        "LLM 胜平负信心",
+  "result.llm.score":          "LLM 比分候选",
+  "result.llm.handicap_num":   "LLM 让球数",
+  "result.llm.handicap_team":  "LLM 让球方向",
+  "result.llm.handicap_pct":   "LLM 让球信心",
+  "result.llm.ou_line":        "LLM 大小球盘口",
+  "result.llm.ou_type":        "LLM 大小球方向",
+  "result.llm.ou_pct":         "LLM 大小球信心",
+  "result.llm.brief_analysis": "LLM 简报",
+  "result.llm.core_data":      "LLM 核心数据",
+  "result.llm.deep_report":    "LLM 深度报告",
+  "result.llm.injuries":       "伤停（喂给模型的原文）",
+  "result.llm.lineups":        "首发（喂给模型的原文）",
+  // —— 没跑过预测时退回的那份（GET /api/sfc/matches 的 pred/llm/book 三块）——
+  "pred.model_group":          "模型分组",
+  "pred.prob.home":            "主胜概率",
+  "pred.prob.draw":            "平局概率",
+  "pred.prob.away":            "客胜概率",
+  "pred.lambda.home":          "主队期望进球 λ",
+  "pred.lambda.away":          "客队期望进球 λ",
+  "pred.top3[].score":         "比分榜 {n} · 比分",
+  "pred.top3[].prob":          "比分榜 {n} · 概率",
+  "pred.handicap":             "让球盘",
+  "pred.at":                   "预测时刻",
+  "llm.win":                   "LLM 胜平负",
+  "llm.win_pct":               "LLM 胜平负信心",
+  "llm.score":                 "LLM 比分候选",
+  "llm.injuries":              "伤停（喂给模型的原文）",
+  "llm.lineups":               "首发（喂给模型的原文）",
+  "book.bookmaker":            "庄家公司",
+  "book.snapshot":             "赔率快照日",
+  "book.bet":                  "玩法",
+  "book.line":                 "盘口线",
+  "book.h":                    "庄家主胜赔率",
+  "book.d":                    "庄家平局赔率",
+  "book.a":                    "庄家客胜赔率",
+  "book.payback":              "庄家返还率",
+  // devig 的下标顺序是 h/d/a（与 book.h/d/a 同序），不是比分榜那种 1/2/3
+  "book.devig[]":              ["庄家主胜去水", "庄家平局去水", "庄家客胜去水"],
+};
+
+/* 右列的值里只有三个是外文/代号，翻掉；其余（Pinnacle、09-28、2-2、L_113）
+   是标识符或日期，翻了反而跟下面那份原始 JSON 对不上。 */
+const SFC_VAL = {
+  "status":             { ok: "成功", error: "失败" },
+  "book.bet":           { "1x2": "胜平负", ah: "亚盘" },
+  "result.model_group": { GLOBAL: "全库兜底" },
+  "pred.model_group":   { GLOBAL: "全库兜底" },
+};
+
+/* 把一个叶子路径翻成中文列名。返回 [显示名, 是否是翻过的]：
+   没翻过的那条要原样显示路径 —— 也正因如此，翻过的那些才需要把原路径塞进 title，
+   不然「后端加个字段自动出现」这条线就断了（对不上原始 JSON 是哪一行）。 */
+function sfcLabel(path) {
+  const hits = [];
+  const norm = path.replace(/\[(\d+)\]/g, (_, i) => (hits.push(+i), "[]"));
+  let label = SFC_LABEL[norm];
+  if (label === undefined) return [path, false];
+  if (Array.isArray(label)) {
+    label = label[hits.length ? hits[hits.length - 1] : -1];
+    if (label === undefined) return [path, false];   // 下标越界 → 退回原路径
+  } else if (label.includes("{n}")) {
+    label = label.replace(/\{n\}/g, () => String((hits.shift() ?? 0) + 1));
+  }
+  return [label, true];
+}
+
+function sfcVal(path, v) {
+  const m = SFC_VAL[path.replace(/\[\d+\]/g, "[]")];
+  const t = m && m[v];
+  return t === undefined ? v : t;   // 认不出就原样，别把陌生值吃掉
+}
+
+/* 这一格该显示哪一份原始数据。跑过就用 POST 的那份，没跑过退回列表接口的三块。 */
+function sfcDetailOf(fid) {
+  const r = sfc.raw[fid];
+  if (r) return r;
+  const m = ((sfc.payload || {}).matches || []).find(x => x.fixture_id === fid);
+  if (!m) return null;
+  return { src: "GET /api/sfc/matches", at: "", data: { pred: m.pred, llm: m.llm, book: m.book } };
+}
+
+function placeSfcPop(cell) {
+  const el = SFC_POP.el, r = cell.getBoundingClientRect();
+  const w = el.offsetWidth, h = el.offsetHeight;
+  // 先试「贴格子右边、上边对齐」，右边放不下就翻到左边；再对两条边夹取，
+  // 保证再窄的窗口也整块可见（夹取后可能盖住格子，那也比露到屏幕外强）。
+  const pad = 8;
+  let x = r.right + pad;
+  if (x + w > innerWidth - pad) x = r.left - w - pad;
+  x = Math.max(pad, Math.min(x, innerWidth - w - pad));
+  let y = Math.min(r.top, innerHeight - h - pad);
+  y = Math.max(pad, Math.min(y, innerHeight - h - pad));
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+}
+
+function openSfcPop(fid, cell) {
+  const d = sfcDetailOf(fid);
+  if (!d) return;
+  SFC_POP.t.innerHTML = `<b>#${esc(fid)}</b> · ${esc(d.src)}` +
+    (d.at ? ` · ${esc(d.at)}` : "") +
+    (d.err ? ` · <span style="color:var(--bad)">失败</span>` : "");
+
+  let inner = "";
+  // 失败的那次：把状态码和后端给的原因单摆一行，再照常把完整响应体铺开 ——
+  // 502 的 body 里就是原因本身，不铺出来等于让人去翻日志。
+  if (d.err) {
+    inner += `<table>
+      <tr><td class="k">HTTP</td><td class="v">${esc(d.err.status ?? "–")}</td></tr>
+      <tr><td class="k">原因</td><td class="v">${esc(d.err.detail ?? "–")}</td></tr>
+      <tr><td class="k">耗时</td><td class="v">${esc(d.err.ms ?? "–")} ms</td></tr>
+    </table>`;
+  }
+  const rows = flatRows(d.data === undefined ? null : d.data, "", []);
+  inner += `<table>` + rows.map(([k, v]) => {
+    const [name, cn] = sfcLabel(k);
+    // 翻过的把原路径挂 title：中文名是给人读的，路径是给「跟原始 JSON 对行」用的。
+    // 没翻过的本来就在显示路径，不用重复挂。
+    return `<tr><td class="k"${cn ? ` title="${esc(k)}"` : ""}>${esc(name)}</td>` +
+           `<td class="v">${esc(sfcVal(k, v))}</td></tr>`;
+  }).join("") + `</table>`;
+
+  // 拍平成表是为了好读，但表终究是我加工过的一道手；原始 JSON 才是「接口返回的全部信息」
+  // 本身（顺序、嵌套都在）。两个都给，谁也不用信谁。
+  let raw;
+  try { raw = JSON.stringify(d.data, null, 2); } catch (_) { raw = "(无法序列化)"; }
+  inner += `<details><summary>原始 JSON（${rows.length} 个叶子字段）</summary>
+    <pre>${esc(raw)}</pre></details>`;
+
+  SFC_POP.b.innerHTML = inner;
+  SFC_POP.el.classList.add("on");     // 先显示再量尺寸：offsetWidth 要布局后才有值
+  sfcPopFid = fid;
+  sfcPopKey = sfc.raw[fid] || "payload";
+  placeSfcPop(cell);
+}
+
+function closeSfcPop() {
+  if (sfcPopFid === null) return;
+  SFC_POP.el.classList.remove("on");
+  sfcPopFid = null;
+  sfcPopKey = null;
+}
+
+SFC_POP.el.querySelector(".px").onclick = () => closeSfcPop();
+
+/* 点「接口预测」格 → 展开这一场的完整接口返回；再点同一格收起。
+   格子里还有 a.jump（跳到预测页）和 a[data-rerun]（重跑），点到它们时让各自的 handler 干活 ——
+   不做这个 early return 的话，点「重跑」会顺手把浮层也弹出来。 */
+$("#sfc-out").addEventListener("click", ev => {
+  if (ev.target.closest("a")) return;
+  const td = ev.target.closest("td[data-detail]");
+  if (!td) return;
+  const tr = td.closest("tr[data-fid]");
+  const fid = tr && parseInt(tr.dataset.fid, 10);
+  if (!fid) return;
+  if (sfcPopFid === fid) { closeSfcPop(); return; }
+  openSfcPop(fid, td);
+});
+
+/* 🔴 关闭只能用 mousedown，不能用 click。打开是 #sfc-out 上的 click 委托，同一次点击两个
+   handler 都会跑；而 mousedown 一定早于 click —— 用 click 关就是「先开→后关」，
+   浮层永远打不开。用 mousedown 天然是「关旧的→（紧接着）开新的」，切格子不用特判。
+   target 落在格子上时不关：那是上面那个委托的活（它自己会判断是切换还是收起）。 */
+document.addEventListener("mousedown", ev => {
+  if (sfcPopFid === null) return;
+  if (ev.target.closest("#sfc-pop")) return;         // 点浮层内部（滚动/选字）不算失焦
+  if (ev.target.closest("td[data-detail]")) return;  // 点格子交给 open 那边切
+  closeSfcPop();
+}, true);
+
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape") closeSfcPop();
+});
+
+// 浮层是 position:fixed，页面一滚就跟格子错位了；改窗口大小则可能整块压到屏幕外。
+// 与其重算位置，不如直接收掉 —— 用户再点一下的成本比重算错位的成本低。
+//
+// 🔴 必须排除【浮层内部自己】的滚动，否则这个功能是废的：`.pb` 是 overflow:auto，
+// 28 个字段铺开有 790px 上下、可视区只有 540px —— deep_report / core_data 那些长文本
+// 不滚动根本看不到，而元素上的 scroll 事件【同样会被 window 的 capture 监听收到】
+// （capture 阶段不看 bubbles:false，实测滚一次 window 就收到 1 次）。
+// 不判断滚动源的话，用户一滚浮层立刻消失。
+// document 滚动时 ev.target 是 document（nodeType 9，没有 closest）→ 落到下面正常关闭。
+window.addEventListener("scroll", ev => {
+  const t = ev.target;
+  if (t && t.nodeType === 1 && t.closest("#sfc-pop")) return;
+  closeSfcPop();
+}, true);
+window.addEventListener("resize", () => closeSfcPop());
+
+/* 存档本期。打开本页时【已经自动存过一次】了（后端 120 秒防抖），这个按钮是手动补一炮：
+   跑完 14 场预测之后想让快照记上刚跑的值，或者不放心自动那次有没有走到。
+   🔴 赛前快照是【填空白、不覆盖】的：已经存过头的场次，再存不会把它改掉 ——
+   所以"补一炮"补的是当初还没跑过预测的那些空位，不是把旧值刷成新值。 */
+$("#sfc-archive").onclick = async () => {
+  const btn = $("#sfc-archive");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = "存档中…";
+  try {
+    const res = await api("/api/sfc/archive", { method: "POST" });
+    const b = res.body || {};
+    showNet(`POST /api/sfc/archive · ${res.status} · ${res.ms}ms`);
+    $("#sfc-meta").textContent =
+      `已存档第 ${b.issue} 期：${b.matches} 场（预测快照 ${b.with_pred} · 关联 id ${b.with_fixture}）` +
+      ` —— 开奖后在「历史」页的分类里选「胜负14场」看复盘`;
+  } catch (e) {
+    showNet(`存档失败 · HTTP ${e.status || "–"} · ${e.ms || "–"}ms`);
+    $("#sfc-meta").textContent = `存档失败：${e.message}`;
+  } finally {
+    // 按钮文案在重画时会回到「跑预测 x/y」，这里只还原自己改的那个
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+};
+
+/* 跑单场，返回 true=成功。批量和格子上的「重跑」共用这一条路径 ——
+   两处各写一遍 normalizePredict + 「刚刚」时间戳迟早会改漏一处。 */
+async function runOneSfcPredict(fid) {
+  const at = "跑于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  try {
+    const res = await api(`/api/predict/${fid}`, { method: "POST" });
+    const body = res.body || {};
+    // 原样留一份整包：格子上只显示三行，但点开要看【接口返回的全部信息】——
+    // normalizePredict 出来的 np 已经把 llm 的长文本字段全丢了，只留它就没得看。
+    sfc.raw[fid] = { src: `POST /api/predict/${fid}`, at, data: body };
+    const np = normalizePredict(body.result || {});
+    // 补一个「跑于」时间戳：接口返回的是原始结果，不含 updated_at。
+    if (np.xgb) np.xgb.at = "刚刚";
+    sfc.st[fid] = { pred: np.xgb, llm: np.llm };
+    return true;
+  } catch (e) {
+    // Error 对象留着（含 e.detail = 后端给的原因），刷新后仍能看出是哪几场没跑成。
+    sfc.st[fid] = e;
+    // 失败的那次照样存整包：502 的 body.detail 就是后端给的原因，比 e.message
+    // 里那串 "HTTP 502 · xxx" 干净，点开能看全；200 之外的响应也是响应。
+    sfc.raw[fid] = { src: `POST /api/predict/${fid}`, at,
+                     err: { status: e.status, detail: e.detail, ms: e.ms }, data: e.body };
+    return false;
+  }
+}
+
+/* 格子上的「重跑」：只补这一场。整批正在跑时不插队（那是 sfc.running 的活）。 */
+async function rerunOneSfc(fid) {
+  if (!fid || sfc.running) return;
+  sfc.st[fid] = "loading";
+  patchSfcPred(fid);
+  const okOne = await runOneSfcPredict(fid);
+  if (okOne) {
+    // 跟批量一个规矩：成功了就以库为准，删掉本地状态再重拉一次接口，
+    // 这样这一格显示的是后端的真值（含正确的 updated_at），赔率/水也跟着刷新。
+    delete sfc.st[fid];
+    await loadSfc(true);
+  } else {
+    patchSfcPred(fid);
+  }
+}
+
+/* ---------------- 胜负彩：一键跑 14 场预测 ----------------
+   【并行】丢给 POST /api/predict/{id}：14 场串行要等好几分钟，而每场都是彼此独立的
+   HTTP 调用，谁先回来就先写进谁那一行；没回来的那格一直转圈（见 predCell 的 loading）。
+   单场失败不影响其它场 —— 失败只标自己那格，别让一个 400 把整批拖黑。
+
+   ⚠️ 会重跑已经有预测的场次（用户口径：点了按钮就 14 场全调）。predictions 表是
+   ON DUPLICATE + COALESCE，已有值不会被覆盖成空；`created_at` 也不会动
+   （它标记【首次】预测时刻，复盘靠它圈「事后补跑」）。
+   在途锁用 sfc.running：按钮 disabled 挡不住回车键。 */
+async function runSfcPredict() {
+  if (sfc.running) return;
+  const ms = (sfc.payload && sfc.payload.matches) || [];
+  const fids = ms.map(m => m.fixture_id).filter(Boolean);
+  if (!fids.length) return;
+
+  sfc.running = true;
+  const btn = $("#sfc-run");
+  btn.disabled = true;
+
+  // 先把 14 格全点亮成转圈，再发请求 —— 反过来的话先返回的那几场会闪一下「未跑」。
+  fids.forEach(fid => { sfc.st[fid] = "loading"; });
+  $$("tr[data-fid]", $("#sfc-out")).forEach(tr => {
+    const fid = parseInt(tr.dataset.fid, 10);
+    const cell = $(".pd-cell", tr);
+    if (cell && sfc.st[fid] === "loading") cell.innerHTML = predCell(null, null, "loading");
+  });
+
+  const total = fids.length;
+  let done = 0, fail = 0;
+  const tick = () => {
+    btn.textContent = `跑预测 ${done}/${total}` + (fail ? ` · 失败 ${fail}` : "");
+  };
+  tick();
+
+  // 🔴 整段包 try/finally：锁必须在 finally 里放。
+  // 单场失败已经由 runOneSfcPredict 内部接住了，但 Promise.all 里还有 patchSfcPred ——
+  // 它要写 DOM、要 syncSfcPop，任何一处意外抛出都会让 Promise.all reject，
+  // 于是 sfc.running 卡在 true、按钮永远 disabled，**只能刷新页面才能再跑**。
+  // 这页是当天的主力工作台，卡死一次代价太大，宁可多了个 try。
+  try {
+    await Promise.all(fids.map(async fid => {
+      const okOne = await runOneSfcPredict(fid);
+      if (!okOne) fail++;
+      done++;
+      tick();
+      patchSfcPred(fid);          // 谁先回来谁先显示，不等其它场
+    }));
+
+    // 跑成功的那些，库里已经是新值了 —— 清掉本地状态，让页面以库为准；
+    // 不清的话 sfc.st 会一直压着 DB，at 永远停在「刚刚」，过一天还写着「刚刚」。
+    // 失败的【留着】，不然一刷新就变回「未跑」，看不出是哪几场没跑成。
+    fids.forEach(fid => { if (!(sfc.st[fid] instanceof Error)) delete sfc.st[fid]; });
+
+    // 全部跑完再拉一次接口：庄家盘 / 体彩盘 / 水 也顺便跟着刷新，at 换回后端的 updated_at
+    btn.textContent = "刷新中…";
+    await loadSfc(true);
+  } catch (e) {
+    console.error("跑 14 场预测中途异常：", e);
+    showNet("批量预测中断 · " + (e && e.message ? e.message : e));
+  } finally {
+    sfc.running = false;
+    btn.disabled = false;
+    // 中断时 done/fail 只统计到抛出的那一刻，如实报出来，别假装跑完了 14 场
+    btn.textContent = fail ? `重跑 14 场（上批失败 ${fail}）` : "重跑 14 场";
+  }
+}
+
+/* 只重画一格，不重画整张表 —— 整张表重画会把其它还在转圈的格子打断。 */
+function patchSfcPred(fid) {
+  const tr = $(`#sfc-out tr[data-fid="${fid}"]`);
+  const cell = tr && $(".pd-cell", tr);
+  if (cell) {
+    const s = sfc.st[fid];
+    if (s === "loading") cell.innerHTML = predCell(null, null, "loading");
+    else if (s instanceof Error) cell.innerHTML = predCell(null, null, s);
+    else cell.innerHTML = predCell(s.pred, s.llm, null);
+  }
+  // 格子换了内容就会长高或变矮，锚在它旁边的浮层得跟着挪；
+  // 数据指纹变了还会顺带重铺内容（「重跑」失败那条路只走 patchSfcPred、不走 renderSfc，
+  // 少了这一句浮层就会一直显示上一次的旧原因）。
+  // 放在最后、不跟着上面两个 return 走 —— 找不到格子时恰恰更需要它去把浮层收掉。
+  syncSfcPop();
+}
+
+$("#sfc-run").onclick = () => runSfcPredict();
+
+/* ---------------- 预测 ---------------- */
+let ticker = null;
+let predicting = false;   // 在途锁：按钮 disabled 挡不住回车键
+
+async function runPredict() {
+  if (predicting) return;   // 一次预测 = 一次 LLM 调用(花钱) + 一次写库，不能重入
+  const fid = parseInt($("#fid").value, 10);
+  const out = $("#predict-out");
+  if (!fid) { out.innerHTML = `<div class="err">请先填写 fixture_id</div>`; return; }
+
+  const btn = $("#run");
+  predicting = true;
+  btn.disabled = true;
+  const t0 = performance.now();
+  out.innerHTML = `<div class="loading">
+      正在预测 fixture <span class="num">${fid}</span> …
+      <span class="num" id="el">0</span>s
+      <br><small>XGB 特征 → 伤停/首发（实时 API）→ DeepSeek LLM</small>
+    </div>`;
+  ticker = setInterval(() => {
+    const el = $("#el");
+    if (el) el.textContent = ((performance.now() - t0) / 1000).toFixed(0);
+  }, 200);
+
+  try {
+    // 先拿比赛基本信息（预测接口只回数字，不回队名），失败也不阻塞预测
+    const fixtureP = api(`/api/fixtures/${fid}`)
+      .then(r => r.body).catch(() => null);
+
+    const res = await api(`/api/predict/${fid}`, { method: "POST" });
+    const fixture = await fixtureP;
+    const rec = normalizePredict(res.body.result, fixture);
+
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    showNet(`POST /api/predict/${fid} · ${res.status} · ${res.ms}ms`);
+    out.innerHTML = renderRecord(rec, { raw: res.body });
+    out.insertAdjacentHTML("beforeend",
+      `<div class="hint" style="margin-top:8px">服务端耗时 ${secs}s · 已写入 predictions 表</div>`);
+  } catch (e) {
+    showNet(`POST /api/predict/${fid} · 失败`);
+    out.innerHTML = `<div class="err">预测失败\n${esc(e.message)}</div>`;
+  } finally {
+    clearInterval(ticker);
+    predicting = false;
+    btn.disabled = false;
+  }
+}
+$("#run").onclick = runPredict;
+$("#fid").addEventListener("keydown", e => { if (e.key === "Enter") runPredict(); });
+
+/* ---------------- 历史预测 ---------------- */
+const state = { page: 1, size: 20, date: "", cat: "", total: 0, loaded: false };
+let historySeq = 0;   // 请求序号：快速改筛选时，丢弃迟到响应的结果
+
+async function loadHistory(page) {
+  const seq = ++historySeq;
+  state.page = page || 1;
+  state.date = $("#h-date").value;
+  state.cat  = $("#h-cat").value;
+  state.size = parseInt($("#h-size").value, 10);
+
+  const out = $("#history-out");
+  out.innerHTML = `<div class="loading">加载中 …</div>`;
+  $("#h-pager").innerHTML = "";
+  $("#h-search").disabled = true;
+
+  // 胜负14场是【另一个彩种、另一套数据形状】：一期一卡的复盘，不是按场次的预测记录，
+  // 所以走 /api/sfc/issues 而不是 /api/predictions。seq 已经在上面递增过了，
+  // 转交过去，两种模式共用同一个「丢弃迟到响应」的序号。
+  // 分页/每页条数/日期筛选不用另接：renderPager 内部调的就是 loadHistory，
+  // 而 loadHistory 会在这里再判一次 state.cat。
+  if (state.cat === "sfc14") return loadSfcHistory(seq);
+
+  const qs = new URLSearchParams({ page: state.page, page_size: state.size });
+  if (state.date) qs.set("date", state.date);
+  if (state.cat)  qs.set("category", state.cat);
+
+  try {
+    const res = await api(`/api/predictions?${qs}`);
+    if (seq !== historySeq) return;        // 已有更新的请求发出，本次结果作废
+    const { data = [], total = 0 } = res.body || {};
+    state.total = total;
+    state.loaded = true;
+
+    showNet(`GET /api/predictions · ${res.status} · ${res.ms}ms`);
+
+    if (!data.length) {
+      // total 才是「有没有记录」的判据。data 为空只说明这一页没数据，
+      // 越界页（或两次请求之间 total 变小）时 total 仍 > 0，不能写成「共 0 条」。
+      const pages = Math.max(1, Math.ceil(total / state.size));
+      out.innerHTML = total
+        ? `<div class="empty">本页没有数据 —— 当前共 ${total} 条、${pages} 页，
+             请回到第 1~${pages} 页</div>`
+        : `<div class="empty">没有符合条件的预测记录</div>`;
+      $("#h-total").textContent = total
+        ? `共 ${total} 条 · 第 ${state.page}/${pages} 页`
+        : "共 0 条";
+      if (total) renderPager(pages);
+      return;
+    }
+
+    const pages = Math.max(1, Math.ceil(total / state.size));
+    $("#h-total").textContent =
+      `共 ${total} 条 · 第 ${state.page}/${pages} 页${state.date ? ` · ${state.date}` : ""}`;
+
+    out.innerHTML = data
+      .map(d => renderRecord(d, { collapsible: true }))
+      .join("");
+
+    // 展开的卡片里补一个「载入预测页」入口
+    $$("#history-out details").forEach((el, i) => {
+      const fid = data[i]?.basic?.fixture_id;
+      if (!fid) return;
+      const link = document.createElement("a");
+      link.className = "small";
+      link.textContent = "→ 在「预测」页重新跑这场";
+      link.style.display = "inline-block";
+      link.style.marginTop = "10px";
+      link.onclick = ev => { ev.preventDefault(); loadIntoPredict(fid); };
+      el.querySelector(".bd").appendChild(link);
+    });
+
+    renderPager(pages);
+  } catch (e) {
+    if (seq !== historySeq) return;
+    out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
+    $("#h-total").textContent = "";   // 清掉上次的条数，否则报错时顶栏还写着「共 137 条」
+    $("#h-pager").innerHTML = "";
+  } finally {
+    // 只有最新那次请求才解锁按钮，否则旧请求先回来会把新请求的锁放掉
+    if (seq === historySeq) $("#h-search").disabled = false;
+  }
+}
+
+/* ---------------- 历史 · 胜负14场（一期一卡复盘） ----------------
+   和「竞彩」分类是两套完全不同的东西：竞彩按【场次】出一张预测卡，胜负彩按【期号】
+   出一张复盘卡。所以走 /api/sfc/issues，不硬塞进 renderRecord 的形状里。 */
+
+/* 五个头。键名与顺序都要跟
+   app/services/sfc_archive_service.py 的 _HEAD_LABELS（→ head_order）一致：模型三头在前，
+   市场两列在后。这里【故意】不读 head_order 而写死 —— head_order 是常量、每期都一样，
+   写死保证列不会因后端改动而在卡片之间跳来跳去。代价：后端加第六个头时这里要同步改，
+   否则那一列会被静默丢掉。 */
+const SFC_HEADS = [
+  { key: "prob", name: "prob头" },
+  { key: "lam",  name: "λ头" },
+  { key: "llm",  name: "LLM头" },
+  { key: "mkt",  name: "庄家盘" },
+  { key: "had",  name: "体彩盘" },
+];
+const SFC_DIR = { home: "主胜", draw: "平局", away: "客胜" };
+const SFC_RES = { "3": "胜", "1": "平", "0": "负" };
+
+async function loadSfcHistory(seq) {
+  const out = $("#history-out");
+  const qs = new URLSearchParams({ page: state.page, page_size: state.size });
+  if (state.date) qs.set("date", state.date);   // 按【停售日】筛：一期就是这天停售的那期
+
+  try {
+    const res = await api(`/api/sfc/issues?${qs}`);
+    if (seq !== historySeq) return;
+    const { data = [], total = 0 } = res.body || {};
+    state.total = total;
+    state.loaded = true;
+    showNet(`GET /api/sfc/issues · ${res.status} · ${res.ms}ms`);
+
+    const pages = Math.max(1, Math.ceil(total / state.size));
+    if (!data.length) {
+      // 空态要说清「为什么会空」：存档不是定时的，是打开胜负彩页时顺手做的
+      out.innerHTML = total
+        ? `<div class="empty">本页没有数据 —— 当前共 ${total} 期、${pages} 页，
+             请回到第 1~${pages} 页</div>`
+        : `<div class="empty">还没有归档过任何一期胜负彩。<br>
+             存档是打开「胜负14场」页时自动做的（也可手动点「存档本期」）——
+             体彩上游只返回当前期，翻期之后这一期的对阵和赔率就再也取不回来了。</div>`;
+      $("#h-total").textContent =
+        total ? `共 ${total} 期 · 第 ${state.page}/${pages} 页` : "共 0 期";
+      if (total) renderPager(pages);
+      return;
+    }
+
+    $("#h-total").textContent =
+      `共 ${total} 期 · 第 ${state.page}/${pages} 页` + (state.date ? ` · 停售日 ${state.date}` : "");
+    out.innerHTML = data.map(renderSfcIssue).join("");
+    $$("a.jump", out).forEach(a => a.onclick = ev => {
+      ev.preventDefault();
+      loadIntoPredict(parseInt(a.dataset.fid, 10));
+    });
+    renderPager(pages);
+  } catch (e) {
+    if (seq !== historySeq) return;
+    out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
+    $("#h-total").textContent = "";
+    $("#h-pager").innerHTML = "";
+  } finally {
+    if (seq === historySeq) $("#h-search").disabled = false;
+  }
+}
+
+function sfcHeadBar(heads) {
+  const scored = SFC_HEADS
+    .map(h => ({ ...h, ...(heads[h.key] || {}) }))
+    .filter(h => h.n && h.acc !== null && h.acc !== undefined);
+  // 🔴 最准/最差按【对率】挑，不按「错几场」的绝对值 —— 各头分母天然不同（体彩没开
+  // 赔率的场次不进市场两列的分母），比绝对值等于拿 5 场的「错 1」去赢 12 场的「错 4」。
+  let best = null, worst = null;
+  if (scored.length) {
+    best  = scored.reduce((a, b) => (b.acc > a.acc ? b : a));
+    worst = scored.reduce((a, b) => (b.acc < a.acc ? b : a));
+  }
+  const tie = best && worst && best.key === worst.key;   // 五个头一样准，就别同时描绿描红
+
+  return `<div class="heads">` + SFC_HEADS.map(h => {
+    const s = heads[h.key] || {};
+    const cls = !s.n ? ""
+      : (best && h.key === best.key ? " best"
+      : (!tie && worst && h.key === worst.key ? " worst" : ""));
+    const v = s.n
+      ? `错 ${s.wrong}<span class="sub">/${s.n} · ${pct(s.acc)} 对</span>`
+      : `<span class="sub">没有数据</span>`;
+    return `<div class="h${cls}"><div class="k">${esc(h.name)}</div><div class="v">${v}</div></div>`;
+  }).join("") + `</div>`;
+}
+
+/* 金额一律是整元。1 万以上折成「万」保留 1 位（奖金跨度 3,085 ~ 5,000,000，
+   全写整数一屏都是数字），1 万以下原样带千分位。null 显示 –，绝不显示 0。 */
+// ⚠️ 比 pct/fnum 多挡一个 `v === ""`：那两个是【调用处都带守卫】的，
+// 这个在 sfcPrizeRow 里是裸调的，而 Number("") === 0 ⇒ 空串会显示成「¥0」
+// ——「这档 0 元」和「这档没数据」是两回事，正是 _money 那行注释警告的坑。
+const yuan = v => (v === null || v === undefined || v === "" || isNaN(v)) ? "–"
+  : (v >= 10000 ? (v / 10000).toFixed(1) + "万" : Number(v).toLocaleString("en-US"));
+
+/* 本期销量 / 各奖级奖金 + 中奖注数。
+   🔴 奖级不是恒定的两档，别写死「一等奖/二等奖」——
+   2005~2019 上游把【任选9场】当第三档塞在 prizeLevelList 里，2020 起改放 prizeLevelListRj，
+   而历史导入只读了前者 ⇒ 库里的确有期次是 3 档、有期次任九缺失。这里【有几档画几档】。
+   一期都没抓到（如刚存档、还没开奖的 26134）返回空串，整行不画。 */
+function sfcPrizeRow(d) {
+  const pz = (d.prizes || []).map(p => {
+    const n = (p.count === null || p.count === undefined)
+      ? "" : ` <span class="off">${Number(p.count).toLocaleString("en-US")}注</span>`;
+    return `<span class="pz"><b>${esc(p.level)}</b>¥${yuan(p.amount)}${n}</span>`;
+  });
+  // 🔴 两个销量是【两个奖池】，必须分开标 —— 26133 期 1816万(胜负彩) / 1318万(任九)，
+  // 写成一行「销量」会让人以为奖金是从那 1816万里出的。
+  if (d.sale_amount !== null && d.sale_amount !== undefined) {
+    pz.push(`<span class="pz"><b>胜负彩销量</b>¥${yuan(d.sale_amount)}</span>`);
+  }
+  if (d.rj_sale_amount !== null && d.rj_sale_amount !== undefined) {
+    pz.push(`<span class="pz"><b>任九销量</b>¥${yuan(d.rj_sale_amount)}</span>`);
+  }
+  return pz.length ? `<div class="prow">${pz.join("")}</div>` : "";
+}
+
+function renderSfcIssue(d) {
+  const rows = (d.matches || []).map(m => {
+    const res = m.result
+      ? `<b>${esc(SFC_RES[m.result] || m.result)}</b>` + (m.result_src === "fixtures"
+          ? ` <span class="fid" title="体彩彩果还没抓到，这个是用 fixtures 的比分推的">推</span>` : "")
+      : `<span class="off">未开</span>`;
+
+    const cells = SFC_HEADS.map(h => {
+      const c = (m.cells || {})[h.key] || {};
+      if (!c.pick) return `<td class="off">–</td>`;
+      const cls = c.hit === true ? "hit" : c.hit === false ? "miss" : "none";
+      return `<td><span class="pk ${c.pick} ${cls}">${SFC_DIR[c.pick]}</span></td>`;
+    }).join("");
+
+    // 与体彩页同一个 jump 模式：编号可点，直达「预测」页重跑这场
+    const numCell = m.fixture_id
+      ? `<a class="small jump" data-fid="${esc(m.fixture_id)}"
+            title="在「预测」页跑这场">${esc(m.no)}</a>`
+      : esc(m.no);
+
+    return `<tr>
+      <td class="mnum">${numCell}
+        ${m.fixture_id ? `<div class="fid">#${esc(m.fixture_id)}</div>` : ""}</td>
+      <td>${esc(m.home)} <span class="off">vs</span> ${esc(m.away)}</td>
+      <td>${res}</td>
+      <td>${esc(m.score || "–")}</td>
+      ${cells}
+    </tr>`;
+  }).join("");
+
+  const bullets = (d.bullets || []).map(b => {
+    const s = String(b);
+    return `<li${s.startsWith("⚠️") ? ' class="warn"' : ""}>${esc(s)}</li>`;
+  }).join("");
+
+  return `<div class="card rev">
+    <div class="rh">
+      <span class="iss">第 ${esc(d.issue)} 期</span>
+      <span>${esc(d.lottery_name || "胜负游戏")}</span>
+      <span>停售 ${fmtDate(d.sale_end)}</span>
+      <span>开奖 ${fmtDate(d.draw_time)}</span>
+      <span><b>${d.scored_count}/${d.total_count}</b> 场已出赛果</span>
+      ${d.archived_at ? `<span class="fid">存档于 ${esc(d.archived_at)}</span>` : ""}
+    </div>
+    ${sfcPrizeRow(d)}
+    <h4>头级（错 / 已判）</h4>
+    ${sfcHeadBar(d.heads || {})}
+    <h4>复盘</h4>
+    <ul>${bullets}</ul>
+    <h4>明细</h4>
+    <table>
+      <thead><tr><th>场次</th><th>对阵</th><th>赛果</th><th>比分</th>
+        ${SFC_HEADS.map(h => `<th>${esc(h.name)}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="hint" style="margin-top:10px">
+      判分优先用<b>体彩官方彩果</b>（延期/取消怎么算按体彩的规矩）；彩果还没抓到的场次
+      才退回到我们自己的 fixtures 比分（赛果列标「推」）—— 那是 <b>90 分钟</b>口径，
+      取 fulltime 不取含加时的 goals。
+      <br>
+      <b>每个头各有各的分母</b>：某场没跑过预测、或体彩/庄家那边没开赔率，
+      这场就不进那个头的分母。
+      <br>
+      λ头 走泊松推 1x2（不是只比 <code>λ主 &gt; λ客</code>，那样会把平局整个丢掉）。
+      <span class="fid">✓</span> 判对、<span class="fid">✗</span> 判错、空白 = 那个头这场没数据。
+    </div>
+  </div>`;
+}
+
+function renderPager(pages) {
+  const box = $("#h-pager");
+  if (pages <= 1) { box.innerHTML = ""; return; }
+
+  const p = state.page;
+  // 当前页两侧各 2 页，首尾页常驻
+  const nums = new Set([1, pages, p, p - 1, p + 1, p - 2, p + 2]);
+  const list = [...nums].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+
+  let html = `<button class="ghost" ${p === 1 ? "disabled" : ""} data-go="1">« 首页</button>
+              <button class="ghost" ${p === 1 ? "disabled" : ""} data-go="${p - 1}">上一页</button>`;
+  let prev = 0;
+  for (const n of list) {
+    if (prev && n - prev > 1) html += `<span class="info">…</span>`;
+    html += `<button class="ghost ${n === p ? "cur" : ""}" data-go="${n}">${n}</button>`;
+    prev = n;
+  }
+  html += `<button class="ghost" ${p === pages ? "disabled" : ""} data-go="${p + 1}">下一页</button>
+           <button class="ghost" ${p === pages ? "disabled" : ""} data-go="${pages}">末页 »</button>
+           <span class="info">跳至</span>
+           <input type="number" id="h-jump" min="1" max="${pages}" style="width:70px">
+           <span class="info">/ ${pages}</span>`;
+
+  box.innerHTML = html;
+  $$("button[data-go]", box).forEach(b => b.onclick = () => {
+    const n = parseInt(b.dataset.go, 10);
+    if (n >= 1 && n <= pages && n !== p) { loadHistory(n); window.scrollTo({ top: 0 }); }
+  });
+  const jump = $("#h-jump");
+  if (jump) jump.onkeydown = e => {
+    if (e.key !== "Enter") return;
+    const n = parseInt(jump.value, 10);
+    if (n >= 1 && n <= pages) {
+      loadHistory(n);
+      window.scrollTo({ top: 0 });
+    } else {
+      // 越界时原来什么都不做，用户以为页面卡了 —— 给个明确反馈
+      jump.value = "";
+      jump.placeholder = `1~${pages}`;
+      jump.classList.add("bad-input");
+      setTimeout(() => jump.classList.remove("bad-input"), 1200);
+    }
+  };
+}
+
+$("#h-search").onclick = () => loadHistory(1);
+$("#h-reset").onclick = () => {
+  $("#h-date").value = ""; $("#h-cat").value = "";
+  $("#h-size").value = "20"; loadHistory(1);
+};
+$("#h-size").onchange = () => loadHistory(1);
+$("#h-date").onchange = () => loadHistory(1);
+$("#h-cat").onchange = () => loadHistory(1);
+
+/* ---------------- 启动：默认落在体彩页（每天的入口） ---------------- */
+showNet("准备就绪 · 服务 " + location.origin);
+loadJc(false);
+</script>
+</body>
+</html>

@@ -86,7 +86,13 @@ def main():
         tid = log_ticket(payload)
         print(f"✅ 注单 #{tid} 已记录（赛前依据已锁定，赛后只回填结果）")
     elif args.cmd == "settle":
-        print(f"✅ {settle_bets()}")
+        r = settle_bets()
+        print(f"✅ 腿 {r['legs_updated']} 条 / 注单 {r['tickets_settled']} 张已结算")
+        if r["pool_tickets_manual"]:
+            print(f"⚠️  {len(r['pool_tickets_manual'])} 张彩池制注单（胜负彩复式）"
+                  f"【未自动结算】: {r['pool_tickets_manual']}")
+            print("    名次(一等/二等)与奖金只能来自体彩奖金表，票面 odds 算不出来。")
+            print("    腿级结果已回填，注单级请人工填 status/payout/pnl 后收工。")
     elif args.cmd == "report":
         md = weekly_report(args.week)
         print(md)

@@ -147,11 +147,25 @@ def _leg_result(market: str, selection: str, line_val, hg: int, ag: int) -> str:
         else:
             return "push"
         return "win" if selection == actual else "lose"
+    if market == "sfc_1x2":
+        # 胜负彩复式：selection 存的是这一场的【票面号串】("3" / "30" / "310")，
+        # 所以 leg_result 的含义是「票面盖住这场没有」，不是串关那种「选的那项中没中」。
+        # 🔴 这两个意思不能混着统计 —— 三选天然 100%、双选 ~70%，那是设计参数不是技能，
+        #    而且在彩池制里腿覆盖率【与收益无映射】(实测有票腿覆盖 79% 而 ROI -100%)。
+        #    周报 section 2 因此单列一行叫「胜负彩覆盖(非命中)」。见 _render 那边同名注释。
+        actual = "3" if m > 0 else ("1" if m == 0 else "0")
+        return "win" if actual in str(selection) else "lose"
     raise ValueError(f"未知玩法 {market}")
 
 
 def settle_bets(db=None) -> dict:
-    """按 fixtures 已完赛结果回填 bet_legs.leg_result, 并重算注单 status/payout/pnl"""
+    """按 fixtures 已完赛结果回填 bet_legs.leg_result, 并重算注单 status/payout/pnl
+
+    🔴 例外：彩池制注单(胜负彩复式)只回填腿级、注单级【跳过】并回报在 pool_tickets_manual。
+       理由两条都有独立决定性：① 13/14 是二等奖(赢了钱)但「全腿覆盖」判据会算成 lost；
+       ② 票面 per-leg odds = 1/覆盖数，连乘 = 1/P(全中)，那是概率的倒数不是赔率，
+          拿它 × stake 会写一个凭空的六位数进账本。详见下面循环里的注释。
+    """
     own = db is None
     if own:
         db = SessionLocal()
@@ -175,10 +189,23 @@ def settle_bets(db=None) -> dict:
         tickets = db.execute(text("""SELECT id, stake, total_odds FROM bet_journal
             WHERE status='pending'""")).mappings().all()
         settled = 0
+        pool_manual = []
         for tk in tickets:
-            lr = [r["leg_result"] for r in db.execute(text("""SELECT leg_result FROM bet_legs
-                WHERE ticket_id=:tid"""), {"tid": tk["id"]}).mappings().all()]
+            legs_rows = db.execute(text("""SELECT leg_result, market FROM bet_legs
+                WHERE ticket_id=:tid"""), {"tid": tk["id"]}).mappings().all()
+            lr = [r["leg_result"] for r in legs_rows]
             if any(x is None for x in lr):
+                continue
+            # 🔴 彩池制注单(胜负彩复式)【不自动结算】—— 两个独立的理由，任一条都足够：
+            #   ① 名次对不上：13/14 是【二等奖】= 赢了钱，但下面那条「全腿覆盖才算赢」
+            #      会把它判成 lost、payout 记 0。7 个号里错 1 个照样有奖，串关注单没这回事。
+            #   ② 金额根本算不出：payout 只能来自体彩奖金表(奖金 = 池 ÷ 中奖注数 ÷ 注数)，
+            #      而票面上的 per-leg odds 记的是 1/覆盖数，连乘 = 1/P(全中) —— 那是
+            #      【概率的倒数】不是赔率。拿它 × stake 会往账本写一个凭空的六位数。
+            #    留 NULL 是「你还欠这笔」；填个假数是「账已经平了，别管了」。后者更坏。
+            #    腿级照回填(它答的是「14 场里盖住几场」，那个数是对的)，注单级人工填奖金。
+            if any(r["market"] == "sfc_1x2" for r in legs_rows):
+                pool_manual.append(tk["id"])
                 continue
             status = "won" if all(x in ("win", "push") for x in lr) else "lost"
             payout = None
@@ -206,7 +233,8 @@ def settle_bets(db=None) -> dict:
                        {"st": status, "po": payout, "pn": pnl, "now": datetime.now(), "id": tk["id"]})
             settled += 1
         db.commit()
-        return {"legs_updated": updated, "tickets_settled": settled}
+        return {"legs_updated": updated, "tickets_settled": settled,
+                "pool_tickets_manual": pool_manual}
     finally:
         if own:
             db.close()
@@ -275,8 +303,19 @@ def weekly_report(week: str | None = None, db=None) -> str:
                 continue
             w = sum(1 for g in sub if g["leg_result"] == "win")
             L.append(f"| {name} | {len(sub)} | {w} | {w / len(sub) * 100:.0f}% |")
+        # 🔴 胜负彩复式单列一行, 且名字里就写明「覆盖(非命中)」——
+        #    同一个 leg_result 在两种玩法里不是一个意思:
+        #      串关      : 「我选的那一项中没中」= 技能, 40~60% 算正常
+        #      胜负彩复式: 「我的票面盖住这场没」= 设计参数, 三选天然 100%、双选~70%
+        #    而且彩池制里腿覆盖率【与收益无映射】(实测有票腿命中 79% 而 ROI -100%)。
+        #    混进上面三行会把串关命中率算高, 也会让这一行被读成「选得不错」。
+        sfc = [g for g in legs if g["market"] == "sfc_1x2" and g["leg_result"] in ("win", "lose")]
+        if sfc:
+            sw = sum(1 for g in sfc if g["leg_result"] == "win")
+            L.append(f"| 胜负彩覆盖(非命中) | {len(sfc)} | {sw} | {sw / len(sfc) * 100:.0f}% |")
         main_legs = [g for g in legs if g["ticket_id"] in {r["id"] for r in rows if r["is_main"]}]
-        ml = [g for g in main_legs if g["leg_result"] in ("win", "lose")]
+        ml = [g for g in main_legs if g["leg_result"] in ("win", "lose")
+              and g["market"] != "sfc_1x2"]           # 🔴 同池制腿不进「命中率」, 见上
         if ml:
             mw = sum(1 for g in ml if g["leg_result"] == "win")
             L.append(f"\n主推腿命中 {mw}/{len(ml)} = {mw / len(ml) * 100:.0f}%")
@@ -316,6 +355,14 @@ def weekly_report(week: str | None = None, db=None) -> str:
         L.append(f"- 负 Edge 腿（冲动单嫌疑）：{len(neg)} 条{'：' + '、'.join(x['match_label'] for x in neg[:5]) if neg else ''}")
         pend = [r for r in rows if r["status"] == "pending"]
         L.append(f"- 待结算：{len(pend)} 张")
+        # 彩池制(胜负彩复式)永远不会被 settle 自动平掉 —— 名次与奖金只存在于体彩奖金表。
+        # 不区分的话这行会每周报同一个数, 看起来像卡住了(它不是卡住, 是设计如此)。
+        pool_pend = [r["id"] for r in pend if db.execute(text("""SELECT COUNT(*) FROM bet_legs
+            WHERE ticket_id=:t AND market='sfc_1x2'"""), {"t": r["id"]}).scalar()]
+        if pool_pend:
+            L.append(f"  - 其中 **{len(pool_pend)} 张是胜负彩复式**"
+                     f"（#{'、#'.join(str(i) for i in pool_pend)}）：按设计**不自动结算**，"
+                     f"名次与奖金只能人工按体彩奖金表填。会一直挂在这里，不是卡住。")
         # 累计回撤(全量, 按日)
         allp = db.execute(text("""SELECT bet_date, SUM(pnl) p FROM bet_journal
             WHERE pnl IS NOT NULL GROUP BY bet_date ORDER BY bet_date""")).mappings().all()
