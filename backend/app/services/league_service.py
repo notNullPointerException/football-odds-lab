@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from loguru import logger
 import httpx
 
+from app.core.apifootball import check_api_error
 from app.core.config import settings
 from app.core.whitelist import WHITELIST_LEAGUE_IDS
 from app.models.league import League, Season
@@ -45,6 +46,10 @@ def sync_leagues(db: Session) -> None:
         data = response.json()
     except Exception as e:
         logger.error(f"拉取联赛数据失败: {e}")
+        return
+
+    # API 把拒绝藏在 HTTP 200 的 errors 字段里，不查就会被当成「没数据」静默跳过
+    if check_api_error(data, "拉取联赛清单"):
         return
 
     league_count = 0

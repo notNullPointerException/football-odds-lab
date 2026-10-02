@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
 from loguru import logger
-import httpx
 
+from app.core.apifootball import api_get, check_api_error
 from app.core.config import settings
 from app.models.league import League, Season
 from app.models.team import Team, Venue
+from app.services.season_query import accessible_seasons
 
 
 def sync_teams(db: Session) -> None:
@@ -13,31 +14,30 @@ def sync_teams(db: Session) -> None:
         logger.warning("API_FOOTBALL_KEY 未配置，跳过球队同步")
         return
 
-    # 找所有已启用联赛的当前赛季
-    seasons = (
-        db.query(Season)
-        .join(League)
-        .filter(Season.is_current == True, League.enabled == True)
-        .all()
-    )
+    # 遍历已启用联赛的最近可访问赛季(Free 计划限 2022-2024)
+    seasons = accessible_seasons(db)
     if not seasons:
         logger.warning("没有找到当前赛季，跳过球队同步")
         return
 
+    rejected = 0
     for season in seasons:
         logger.info(f"拉取联赛 {season.league_id} 赛季 {season.year} 的球队...")
 
         try:
-            response = httpx.get(
-                f"{settings.api_football_base_url}/teams",
-                headers={"x-apisports-key": settings.api_football_key},
-                params={"league": season.league_id, "season": season.year},
-                timeout=30.0,
+            data = api_get(
+                "/teams",
+                {"league": season.league_id, "season": season.year},
+                context=f"拉取联赛 {season.league_id} 赛季 {season.year} 球队",
             )
-            response.raise_for_status()
-            data = response.json()
         except Exception as e:
             logger.error(f"拉取联赛 {season.league_id} 球队失败: {e}")
+            rejected += 1
+            continue
+
+        # API 把拒绝藏在 HTTP 200 的 errors 字段里，不查就会被当成「没数据」静默跳过
+        if check_api_error(data, f"拉取联赛 {season.league_id} 赛季 {season.year} 球队"):
+            rejected += 1
             continue
 
         seen_venues = set()
@@ -83,4 +83,9 @@ def sync_teams(db: Session) -> None:
 
         db.commit()
 
-    logger.info("球队同步完成")
+    if rejected:
+        logger.warning(
+            f"球队同步完成：共 {len(seasons)} 个联赛，其中 {rejected} 个被 API 拒绝/失败"
+        )
+    else:
+        logger.info(f"球队同步完成：{len(seasons)} 个联赛全部正常")

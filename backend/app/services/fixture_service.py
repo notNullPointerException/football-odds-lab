@@ -6,10 +6,12 @@ from loguru import logger
 import httpx
 import time
 
+from app.core.apifootball import api_get, check_api_error, raise_if_rejected
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.league import League, Season
 from app.models.fixture import Fixture, FixtureEvent, FixtureLineup, FixtureStatistic, FixturePlayerStat
+from app.services.season_query import accessible_seasons
 
 LIVE_SYNC_INTERVAL = 120  # 秒
 
@@ -80,69 +82,68 @@ def _upsert_fixture(db: Session, row: dict) -> Fixture | None:
     return obj
 
 
+# 往后多同步几天。体彩会把未来几天的比赛摆上货架，而体彩页要显示 fixture_id，
+# 库里就必须先有这些比赛 —— 只同步到「今天」时，页面上的在未来开赛的比赛
+# 一律配不上 id（2026-09-24 实测 21 场里 13 场栽在这）。每天多 1 个请求，
+# Pro 档 7500 次/天，7 天可以忽略不计。
+SYNC_AHEAD_DAYS = 7
+
+
 def sync_fixtures(db: Session) -> None:
-    """每日同步: 遍历已启用联赛当前赛季，拉取近 7 天 + 未来 7 天赛程"""
+    """每日同步: 增量按天拉取赛程(库中最晚完赛日期-2天 → 今天+7天, 每天 1 请求)"""
     if not settings.api_football_key:
         logger.warning("API_FOOTBALL_KEY 未配置，跳过赛程同步")
         return
 
     from datetime import timedelta
     today = datetime.now().date()
-    from_date = (today - timedelta(days=1)).isoformat()
-    to_date = today.isoformat()
 
-    seasons = (
-        db.query(Season)
-        .join(League)
-        .filter(
-            Season.is_current == True,
-            League.enabled == True,
-        )
-        .all()
-    )
-    if not seasons:
-        logger.warning("没有找到当前赛季，跳过赛程同步")
-        return
+    # 增量起点: 库中最新已完赛日期, 留 2 天余量覆盖时区; 空库则近 7 天
+    last = db.execute(text(
+        "SELECT MAX(date) FROM fixtures WHERE status_short IN ('FT','AET','PEN')"
+    )).scalar()
+    if last:
+        start = last.date() - timedelta(days=2)
+    else:
+        start = today - timedelta(days=7)
+
+    # 往后多拉 SYNC_AHEAD_DAYS 天: 起点只由【已完赛】的 MAX(date) 决定，
+    # 未开赛的赛程进不了那个 MAX，所以向前扩不会把增量起点也一起往前推，
+    # 不存在「同步越多、起点越早」的自激。
+    ahead = today + timedelta(days=SYNC_AHEAD_DAYS)
+
+    # 注意: from/to 参数必须搭配 league/team, 单独用会返回 200+errors 静默为空。
+    # 用 date 参数按天拉取全部联赛(与 live sync 一致), 入库全量赛程。
+    logger.info(f"增量同步 {start} ~ {ahead} (按天拉取, 含未来 {SYNC_AHEAD_DAYS} 天)...")
 
     total_synced = 0
-    processed = 0
-    for season in seasons:
-        msg = f"联赛 {season.league_id} 赛季 {season.year}"
-        logger.info(f"拉取{msg}昨日+今日赛程 ({from_date} ~ {to_date})...")
-
+    d = start
+    while d <= ahead:
+        date_str = d.isoformat()
         try:
             response = httpx.get(
                 f"{settings.api_football_base_url}/fixtures",
                 headers={"x-apisports-key": settings.api_football_key},
-                params={
-                    "league": str(season.league_id),
-                    "season": str(season.year),
-                    "from": from_date,
-                    "to": to_date,
-                },
+                params={"date": date_str},
                 timeout=30.0,
             )
             response.raise_for_status()
             data = response.json()
+            # 被拒时 errors 有原因、response 为空；显式记日志，别让它伪装成「当天 0 场」
+            rejected = check_api_error(data, f"拉取 {date_str} 赛程")
+            items = [] if rejected else data.get("response", [])
+            for row in items:
+                _upsert_fixture(db, row)
+            db.commit()
+            total_synced += len(items)
+            print(f"  {date_str}: {len(items)} 场" + ("  <- 被 API 拒绝" if rejected else ""))
         except Exception as e:
-            logger.error(f"拉取{msg}赛程失败: {e}")
-            print(f"  {msg} FAILED: {e}")
-            continue
+            logger.error(f"拉取 {date_str} 赛程失败: {e}")
+            print(f"  {date_str} FAILED: {e}")
 
-        items = data.get("response", [])
-        if not items:
-            continue
-
-        for row in items:
-            _upsert_fixture(db, row)
-
-        db.commit()
-        processed += 1
-        total_synced += len(items)
-        print(f"  [{processed}/{len(seasons)}] {msg}: {len(items)} 场")
+        d += timedelta(days=1)
 
     logger.info(f"赛程每日同步完成，共 {total_synced} 场")
-    print(f"  赛程每日同步完成: {total_synced} 场")
 
     # 赛后子数据同步
     sync_completed_sub_data(db)
@@ -284,18 +285,9 @@ def sync_completed_sub_data(db: Session) -> None:
 
 
 def _fetch_events(db: Session, fixture_id: int) -> None:
-    try:
-        r = httpx.get(
-            f"{settings.api_football_base_url}/fixtures/events",
-            headers={"x-apisports-key": settings.api_football_key},
-            params={"fixture": fixture_id},
-            timeout=30.0,
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        logger.warning(f"拉取事件失败 fixture={fixture_id}: {e}")
-        return
+    context = f"拉取事件 fixture={fixture_id}"
+    data = api_get("/fixtures/events", {"fixture": fixture_id}, context=context)
+    raise_if_rejected(data, context)
 
     for evt in data.get("response", []):
         time_raw = evt.get("time") or {}
@@ -321,18 +313,9 @@ def _fetch_events(db: Session, fixture_id: int) -> None:
 
 
 def _fetch_lineups(db: Session, fixture_id: int) -> None:
-    try:
-        r = httpx.get(
-            f"{settings.api_football_base_url}/fixtures/lineups",
-            headers={"x-apisports-key": settings.api_football_key},
-            params={"fixture": fixture_id},
-            timeout=30.0,
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        logger.warning(f"拉取阵容失败 fixture={fixture_id}: {e}")
-        return
+    context = f"拉取阵容 fixture={fixture_id}"
+    data = api_get("/fixtures/lineups", {"fixture": fixture_id}, context=context)
+    raise_if_rejected(data, context)
 
     for team_entry in data.get("response", []):
         team_raw = team_entry.get("team") or {}
@@ -375,18 +358,9 @@ def _fetch_lineups(db: Session, fixture_id: int) -> None:
 
 
 def _fetch_statistics(db: Session, fixture_id: int) -> None:
-    try:
-        r = httpx.get(
-            f"{settings.api_football_base_url}/fixtures/statistics",
-            headers={"x-apisports-key": settings.api_football_key},
-            params={"fixture": fixture_id},
-            timeout=30.0,
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        logger.warning(f"拉取统计失败 fixture={fixture_id}: {e}")
-        return
+    context = f"拉取统计 fixture={fixture_id}"
+    data = api_get("/fixtures/statistics", {"fixture": fixture_id}, context=context)
+    raise_if_rejected(data, context)
 
     for team_entry in data.get("response", []):
         team_raw = team_entry.get("team") or {}
@@ -405,18 +379,9 @@ def _fetch_statistics(db: Session, fixture_id: int) -> None:
 
 
 def _fetch_player_stats(db: Session, fixture_id: int) -> None:
-    try:
-        r = httpx.get(
-            f"{settings.api_football_base_url}/fixtures/players",
-            headers={"x-apisports-key": settings.api_football_key},
-            params={"fixture": fixture_id},
-            timeout=30.0,
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        logger.warning(f"拉取球员统计失败 fixture={fixture_id}: {e}")
-        return
+    context = f"拉取球员统计 fixture={fixture_id}"
+    data = api_get("/fixtures/players", {"fixture": fixture_id}, context=context)
+    raise_if_rejected(data, context)
 
     for team_entry in data.get("response", []):
         team_raw = team_entry.get("team") or {}
@@ -472,6 +437,8 @@ def sync_live_fixtures(db: Session) -> None:
             )
             response.raise_for_status()
             data = response.json()
+            if check_api_error(data, f"拉取赛程 date={date_str}"):
+                continue
             items = data.get("response", [])
             if items:
                 all_items.extend(items)

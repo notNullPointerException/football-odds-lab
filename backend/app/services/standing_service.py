@@ -2,9 +2,11 @@ from sqlalchemy.orm import Session
 from loguru import logger
 import httpx
 
+from app.core.apifootball import check_api_error
 from app.core.config import settings
 from app.models.league import League, Season
 from app.models.standing import Standing
+from app.services.season_query import accessible_seasons
 
 
 def sync_standings(db: Session) -> None:
@@ -13,16 +15,13 @@ def sync_standings(db: Session) -> None:
         logger.warning("API_FOOTBALL_KEY 未配置，跳过积分榜同步")
         return
 
-    seasons = (
-        db.query(Season)
-        .join(League)
-        .filter(Season.is_current == True, League.enabled == True)
-        .all()
-    )
+    # 遍历已启用联赛的最近可访问赛季(Free 计划限 2022-2024)
+    seasons = accessible_seasons(db)
     if not seasons:
         logger.warning("没有找到当前赛季，跳过积分榜同步")
         return
 
+    rejected = 0
     for season in seasons:
         logger.info(f"拉取联赛 {season.league_id} 赛季 {season.year} 的积分榜...")
 
@@ -37,6 +36,12 @@ def sync_standings(db: Session) -> None:
             data = response.json()
         except Exception as e:
             logger.error(f"拉取联赛 {season.league_id} 积分榜失败: {e}")
+            rejected += 1
+            continue
+
+        # API 把拒绝藏在 HTTP 200 的 errors 字段里，不查就会被当成「没数据」静默跳过
+        if check_api_error(data, f"拉取联赛 {season.league_id} 赛季 {season.year} 积分榜"):
+            rejected += 1
             continue
 
         for entry in data.get("response", []):
@@ -79,7 +84,12 @@ def sync_standings(db: Session) -> None:
 
         db.commit()
 
-    logger.info("积分榜同步完成")
+    if rejected:
+        logger.warning(
+            f"积分榜同步完成：共 {len(seasons)} 个联赛，其中 {rejected} 个被 API 拒绝/失败"
+        )
+    else:
+        logger.info(f"积分榜同步完成：{len(seasons)} 个联赛全部正常")
 
 
 def _make_standing(lid, stat_season, row, team, all_stats, home_stats, away_stats):

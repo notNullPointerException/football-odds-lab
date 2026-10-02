@@ -1,37 +1,38 @@
 from sqlalchemy.orm import Session
 from loguru import logger
-import httpx
 
+from app.core.apifootball import api_get, check_api_error
 from app.core.config import settings
 from app.models.league import League, Season
 from app.models.player import Player, PlayerStats
+from app.services.season_query import accessible_seasons, accessible_season_for_league
 
 
-def _sync_league_players(db: Session, league_id: int, season_year: int) -> None:
-    """同步单个联赛单个赛季的球员"""
+def _sync_league_players(db: Session, league_id: int, season_year: int) -> bool:
+    """同步单个联赛单个赛季的球员。返回 False 表示被 API 拒绝或请求失败。"""
     logger.info(f"拉取联赛 {league_id} 赛季 {season_year} 的球员...")
 
     page = 1
     seen_players = set()
+    failed = False
 
     while True:
         try:
-            response = httpx.get(
-                f"{settings.api_football_base_url}/players",
-                headers={"x-apisports-key": settings.api_football_key},
-                params={
-                    "league": league_id,
-                    "season": season_year,
-                    "page": page,
-                },
-                timeout=30.0,
+            data = api_get(
+                "/players",
+                {"league": league_id, "season": season_year, "page": page},
+                context=f"拉取联赛 {league_id} 赛季 {season_year} 球员 (page={page})",
             )
-            response.raise_for_status()
-            data = response.json()
         except Exception as e:
             logger.error(
                 f"拉取联赛 {league_id} 球员失败 (page={page}): {e}"
             )
+            failed = True
+            break
+
+        # API 把拒绝藏在 HTTP 200 的 errors 字段里，不查就会被当成「没数据」静默跳过
+        if check_api_error(data, f"拉取联赛 {league_id} 赛季 {season_year} 球员"):
+            failed = True
             break
 
         items = data.get("response", [])
@@ -127,7 +128,9 @@ def _sync_league_players(db: Session, league_id: int, season_year: int) -> None:
         page += 1
         logger.debug(f"联赛 {league_id} 球员翻页 {page}/{total_pages}")
 
-    logger.info(f"联赛 {league_id} 球员同步完成")
+    if not failed:
+        logger.info(f"联赛 {league_id} 球员同步完成")
+    return not failed
 
 
 def sync_players_by_league(db: Session, league_id: int) -> None:
@@ -136,11 +139,7 @@ def sync_players_by_league(db: Session, league_id: int) -> None:
         logger.warning("API_FOOTBALL_KEY 未配置，跳过球员同步")
         return
 
-    season = (
-        db.query(Season)
-        .filter(Season.league_id == league_id, Season.is_current == True)
-        .first()
-    )
+    season = accessible_season_for_league(db, league_id)
     if not season:
         logger.warning(f"联赛 {league_id} 没有当前赛季")
         return
@@ -154,17 +153,20 @@ def sync_players(db: Session) -> None:
         logger.warning("API_FOOTBALL_KEY 未配置，跳过球员同步")
         return
 
-    seasons = (
-        db.query(Season)
-        .join(League)
-        .filter(Season.is_current == True, League.enabled == True)
-        .all()
-    )
+    # 遍历已启用联赛的最近可访问赛季(Free 计划限 2022-2024)
+    seasons = accessible_seasons(db)
     if not seasons:
         logger.warning("没有找到当前赛季，跳过球员同步")
         return
 
+    rejected = 0
     for season in seasons:
-        _sync_league_players(db, season.league_id, season.year)
+        if not _sync_league_players(db, season.league_id, season.year):
+            rejected += 1
 
-    logger.info("球员同步完成")
+    if rejected:
+        logger.warning(
+            f"球员同步完成：共 {len(seasons)} 个联赛，其中 {rejected} 个被 API 拒绝/失败"
+        )
+    else:
+        logger.info(f"球员同步完成：{len(seasons)} 个联赛全部正常")
