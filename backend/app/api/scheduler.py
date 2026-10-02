@@ -15,6 +15,7 @@ from app.services.standing_service import sync_standings
 from app.services.fixture_service import sync_fixtures, sync_live_fixtures
 from app.services.prediction_result_service import backfill_results
 from app.services.auto_predict_service import auto_predict
+from app.services.odds_watch_service import odds_watch_job
 
 router = APIRouter()
 
@@ -27,6 +28,7 @@ TASK_MAP = {
     "fixture_live":  ("赛程实时同步", sync_live_fixtures),
     "backfill_pred": ("预测结果回填", backfill_results),
     "auto_predict":  ("赛前自动预测", auto_predict),
+    "odds_watch":    ("赔率快照(手动)", odds_watch_job),
 }
 
 

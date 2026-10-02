@@ -12,6 +12,8 @@ from app.services.standing_service import sync_standings
 from app.services.fixture_service import sync_fixtures, sync_live_fixtures
 from app.services.prediction_result_service import backfill_results
 from app.services.auto_predict_service import auto_predict
+from app.services.bet_journal_service import weekly_review_job
+from app.services.odds_watch_service import odds_watch_job
 
 LIVE_INTERVAL_SECONDS = 2 * 60
 
@@ -28,6 +30,17 @@ _DEFAULT_TASKS = {
                        "interval_seconds": 3600},
     "auto_predict":   {"name": "赛前自动预测",   "start_hour": 12,  "fn": auto_predict,
                        "interval_seconds": None},
+    # 周复盘: scheduler 无周粒度, 用每日 09:06 触发, 非周一函数内部直接返回
+    "bet_review":     {"name": "竞彩周复盘",     "start_hour": 9.1, "fn": weekly_review_job,
+                       "interval_seconds": None},
+    # 竞彩/锐盘赔率快照 —— 🔴 用户 2026-09-21 定：**只在用户发话时手动抓**
+    # （同「竞彩场次由用户提供」的规矩：不自己跑、不自己推断）。
+    # 注册在这里的唯一目的是能走 HTTP 触发并留 scheduler_logs 审计：
+    #     POST /api/scheduler/odds_watch/trigger
+    # 也可以直接 .venv/bin/python tools/odds_watch.py
+    # 🔴 is_enabled=0 是**故意的**，别看到 disabled 就去 DB 里改回来。
+    "odds_watch":     {"name": "赔率快照(手动)", "start_hour": None, "fn": odds_watch_job,
+                       "interval_seconds": None, "is_enabled": 0},
 }
 
 _active_loops: dict[str, asyncio.Task] = {}
@@ -39,13 +52,15 @@ def _seed_defaults():
         for k, v in _DEFAULT_TASKS.items():
             sh = v.get("start_hour")
             iv = v.get("interval_seconds")
+            # 默认启用；个别任务（如手动触发的 odds_watch）自带 is_enabled=0
             db.execute(
                 text(
                     """INSERT IGNORE INTO scheduler_tasks
                        (id, name, interval_seconds, start_hour, is_enabled)
-                       VALUES (:id, :name, :iv, :sh, 1)"""
+                       VALUES (:id, :name, :iv, :sh, :en)"""
                 ),
-                {"id": k, "name": v["name"], "iv": iv, "sh": sh},
+                {"id": k, "name": v["name"], "iv": iv, "sh": sh,
+                 "en": v.get("is_enabled", 1)},
             )
         db.commit()
     finally:
@@ -241,6 +256,13 @@ async def _run_loop(task_key: str):
 
         sh = row.get("start_hour")
         iv = row.get("interval_seconds")
+
+        # 🔴 无 start_hour 又无 interval = 手动任务（如 odds_watch）。
+        # 必须在这里挡住：下面 interval 分支会退化成 `delay = iv or 60`，
+        # 也就是【每 60 秒抓一次】—— 一旦被 enabled 就会打爆 sporttery。
+        if sh is None and iv is None:
+            logger.info(f"[Scheduler] {row['name']} 是手动任务，不自动循环")
+            break
 
         # 计算下一执行时间
         if sh is not None:
