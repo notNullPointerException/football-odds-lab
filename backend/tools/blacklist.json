@@ -1,0 +1,7 @@
+{
+  "comment": "用户指定永久拉黑的对阵，predict_fixture 遇到直接跳过",
+  "fixtures": [
+    {"home": "St. Louis City", "away": "FC Dallas", "note": "025 MLS 2026-08-31 3-3"},
+    {"home": "Cagliari", "away": "Inter", "note": "020 意甲 2026-08-31 0-1 让1球走盘"}
+  ]
+}

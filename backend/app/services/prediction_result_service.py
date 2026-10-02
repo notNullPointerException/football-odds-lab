@@ -1,10 +1,12 @@
 """赛后验证回填：扫描 predictions 表，回填实际结果并计算正确性"""
 
 import json
+import re
 from sqlalchemy import text
 from loguru import logger
 import httpx
 
+from app.core.apifootball import check_api_error
 from app.core.config import settings
 from app.db.session import SessionLocal
 
@@ -61,7 +63,10 @@ def _backfill_one(db, fid: int) -> bool:
                 timeout=10.0,
             )
             r.raise_for_status()
-            items = r.json().get("response", [])
+            data = r.json()
+            if check_api_error(data, f"拉取赛果 fixture={fid}"):
+                return False
+            items = data.get("response", [])
             if items:
                 f_info = items[0].get("fixture", {})
                 st = (f_info.get("status") or {}).get("short")
@@ -115,10 +120,21 @@ def _backfill_one(db, fid: int) -> bool:
     llm_handicap = pred[2] or ""
     if llm_handicap:
         try:
-            # 格式: -1.5 主队86% 或 0.5 客队70%
+            # 格式1: -1.5 主队86% 或 0.5 客队70%
             parts = llm_handicap.split()
+            hc_val = None
             if len(parts) >= 2:
-                hc_val = float(parts[0])
+                try:
+                    hc_val = float(parts[0])
+                except ValueError:
+                    pass
+            # 格式2: 主队让1.0球 / 客队让1.0球
+            if hc_val is None and "让" in llm_handicap:
+                m = re.search(r"(\d+(?:\.\d+)?)", llm_handicap)
+                if m:
+                    v = float(m.group(1))
+                    hc_val = -v if llm_handicap.startswith("主") else v
+            if hc_val is not None:
                 # 负值=主队让，正值=客队让
                 adjusted_home = (gh or 0) + hc_val
                 if adjusted_home > (ga or 0):
@@ -154,6 +170,18 @@ def _backfill_one(db, fid: int) -> bool:
         "gh": gh, "ga": ga,
         "wc": win_correct, "oc": over25_correct,
         "hcc": handicap_correct, "sc": score_in_top3,
+        "fid": fid,
+    })
+
+    # 同步模型对比日志的命中标记（按 fixture_id 更新所有模型的记录）
+    db.execute(text("""
+        UPDATE model_compare_logs SET
+            actual_home_goals=:gh, actual_away_goals=:ga,
+            win_correct=:wc, ou_correct=:oc, score_correct=:sc
+        WHERE fixture_id=:fid
+    """), {
+        "gh": gh, "ga": ga,
+        "wc": win_correct, "oc": over25_correct, "sc": score_in_top3,
         "fid": fid,
     })
     return True
