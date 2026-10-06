@@ -13,6 +13,21 @@ api-sports 把**错误也当 HTTP 200 返回**，形如：
 
 另外网络层会偶发 SSL 断流（`UNEXPECTED_EOF_WHILE_READING`），长循环里一次抖动
 就让整个联赛作废（分页只写了一半）。`api_get` 负责退避重试。
+
+🔴 2026-10-06 结案：那条 SSL 断流的根因**不是** TLS、不是 openssl、更不是
+「api-sports 挂了」，而是 **macOS 系统代理**。
+
+    系统代理指向 127.0.0.1:17890（一个已经不响应任何请求的代理）
+    Python 的 HTTP 库默认读系统代理 —— httpx / requests / urllib 全走
+        `urllib.request.getproxies()`（在 macOS 上是 `scutil --proxy`）
+    curl 不读系统代理 -> 直连 -> 200
+
+于是同一个 URL：curl 200、裸 socket+ssl 200、httpx 全挂。排查时会一路误判成
+「通道断了 / 没开盘 / openssl 装坏了」，因为**唯一正常的那条路(直连)恰好是 curl 走的**。
+
+api-sports.io 直连可达（实测 200），所以这里一律 `trust_env=False` 绕开系统代理。
+⚠️ **别把这个 kwarg 传染给 DeepSeek 调用**（`predict.py:_call_llm`）：那个 host
+走代理是通的，套上去反而多担一份风险。
 """
 import random
 import ssl
@@ -110,7 +125,9 @@ def api_get(
     for attempt in range(1, attempts + 1):
         retry_after = None
         try:
-            response = httpx.get(url, headers=headers, params=params, timeout=timeout)
+            # trust_env=False: 绕开系统代理直连，理由见模块 docstring
+            response = httpx.get(url, headers=headers, params=params, timeout=timeout,
+                                 trust_env=False)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:

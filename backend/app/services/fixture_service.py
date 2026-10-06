@@ -121,11 +121,13 @@ def sync_fixtures(db: Session) -> None:
     while d <= ahead:
         date_str = d.isoformat()
         try:
+            # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
             response = httpx.get(
                 f"{settings.api_football_base_url}/fixtures",
                 headers={"x-apisports-key": settings.api_football_key},
                 params={"date": date_str},
                 timeout=30.0,
+                trust_env=False,
             )
             response.raise_for_status()
             data = response.json()
@@ -429,11 +431,13 @@ def sync_live_fixtures(db: Session) -> None:
     all_items = []
     for date_str in [today, yesterday]:
         try:
+            # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
             response = httpx.get(
                 f"{settings.api_football_base_url}/fixtures",
                 headers={"x-apisports-key": settings.api_football_key},
                 params={"date": date_str},
                 timeout=30.0,
+                trust_env=False,
             )
             response.raise_for_status()
             data = response.json()

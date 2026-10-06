@@ -367,11 +367,13 @@ def _fetch_team_recent_via_api(team_id: int) -> str:
     """通过API拉取球队近10场真实战绩（含逐场对手明细）"""
     try:
         import httpx
+        # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
         r = httpx.get(
             f"{settings.api_football_base_url}/fixtures",
             headers={"x-apisports-key": settings.api_football_key},
             params={"team": team_id, "last": 10},
             timeout=10.0,
+            trust_env=False,
         )
         r.raise_for_status()
         data = r.json().get("response", [])
@@ -419,11 +421,13 @@ def _fetch_lineups_text(fixture_id: int, home_id: int, away_id: int) -> str:
     """拉取确认首发；未公布时返回阵容不确定提示。"""
     try:
         import httpx
+        # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
         r = httpx.get(
             f"{settings.api_football_base_url}/fixtures/lineups",
             headers={"x-apisports-key": settings.api_football_key},
             params={"fixture": fixture_id},
             timeout=10.0,
+            trust_env=False,
         )
         r.raise_for_status()
         data = r.json().get("response", [])
@@ -494,11 +498,13 @@ def _fetch_injuries_text(fixture_id: int, home_id: int, away_id: int) -> str:
     """拉取该场比赛双方伤停/停赛名单，按主客队分组"""
     try:
         import httpx
+        # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
         r = httpx.get(
             f"{settings.api_football_base_url}/injuries",
             headers={"x-apisports-key": settings.api_football_key},
             params={"fixture": fixture_id},
             timeout=10.0,
+            trust_env=False,
         )
         r.raise_for_status()
         data = r.json().get("response", [])

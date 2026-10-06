@@ -37,10 +37,12 @@ def sync_leagues(db: Session) -> None:
     logger.info("开始同步联赛数据...")
 
     try:
+        # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
         response = httpx.get(
             f"{settings.api_football_base_url}/leagues",
             headers={"x-apisports-key": settings.api_football_key},
             timeout=30.0,
+            trust_env=False,
         )
         response.raise_for_status()
         data = response.json()

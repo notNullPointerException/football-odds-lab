@@ -26,11 +26,13 @@ def sync_standings(db: Session) -> None:
         logger.info(f"拉取联赛 {season.league_id} 赛季 {season.year} 的积分榜...")
 
         try:
+            # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
             response = httpx.get(
                 f"{settings.api_football_base_url}/standings",
                 headers={"x-apisports-key": settings.api_football_key},
                 params={"league": season.league_id, "season": season.year},
                 timeout=30.0,
+                trust_env=False,
             )
             response.raise_for_status()
             data = response.json()

@@ -56,11 +56,13 @@ def _backfill_one(db, fid: int) -> bool:
 
     if status not in FINISHED or gh is None or ga is None:
         try:
+            # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
             r = httpx.get(
                 f"{settings.api_football_base_url}/fixtures",
                 headers={"x-apisports-key": settings.api_football_key},
                 params={"id": fid},
                 timeout=10.0,
+                trust_env=False,
             )
             r.raise_for_status()
             data = r.json()
