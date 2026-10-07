@@ -11,3 +11,10 @@ dist/
 logs/
 *.log
 *.sql
+
+# 生成物 / IDE
+.idea/
+# 赔率回填缓存（分片跑会生成 jc_history_cache.1of6.json 等），体积大且可重跑
+backend/tools/jc_history_cache*.json
+# build_jc_map.py 的产物
+backend/tools/jc_map.json
