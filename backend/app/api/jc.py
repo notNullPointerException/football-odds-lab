@@ -157,6 +157,11 @@ def _build_payload() -> dict:
                 "league": m.get("leagueAbbName", ""),
                 "home": m.get("homeTeamAbbName", ""),
                 "away": m.get("awayTeamAbbName", ""),
+                # 体彩的三字母缩写码（与 homeTeamAbbEnName 恒等，实测 24/24 队位）。
+                # 队名判不出时 jc_match_service 拿它兜底 —— 中文比拉丁是没有信号的，
+                # 码是独立于语言的第二路。同时透出去给前端排查用。
+                "home_code": m.get("homeTeamCode") or "",
+                "away_code": m.get("awayTeamCode") or "",
                 "kickoff": f"{m.get('matchDate', '')} {m.get('matchTime', '')}".strip(),
                 # 体彩给了停售时刻就用它，没给（现状）前端回落到开球时间
                 "close_time": _pool_close(m),

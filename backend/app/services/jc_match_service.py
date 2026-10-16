@@ -14,8 +14,12 @@ teams 表同时有 name（拉丁）和 name_zh（中文）两列。拿体彩中�
 定位用 (home_id, away_id) —— 同一对主客队在同一时刻只可能有一场，不会像
 「五场欧国联全排在 02:45」那样撞车。旧算法会被时间窗内的多场候选互相拉平。
 
-【兜底】teams.name_zh 覆盖率约 44%，查不到的走 overrides 人工表，不猜。
-人工指定不仅用于「算法判不出」，也用于「算法判错了」，所以它排在最前面。
+【兜底一】teams.name_zh 覆盖率约 44%，中文比不出的走**体彩英文缩写码**（`_decide_by_code`）。
+体彩的 `homeTeamCode` 与 `teams.code` 是两套约定，用公共前缀比 + 窗内唯一胜出。
+2026-10-07 实测：在售 12 场里队名路线只配上 7 场，加码兜底后 10 场，逐场核验全对。
+
+【兜底二】仍判不出的走 overrides 人工表，不猜。人工指定不仅用于「算法判不出」，
+也用于「算法判错了」，所以它排在最前面。
 
 只读，不写任何表。
 """
@@ -57,6 +61,35 @@ def _side_score(jc_name: str, db_name: str):
     return len(sa & sb) / max(len(sa), len(sb))
 
 
+def _code_sim(a: str, b: str) -> float:
+    """两个三字母码的【公共前缀比】。0.0 = 首字母就不同。
+
+    体彩的 `homeTeamCode` 与 API-Football 的 `teams.code` 是**两套缩写约定**，
+    只有一部分重合：
+
+        相同: GNI=Gnistan  BOT..?  FLA=Flamengo  FLU=Fluminense  HJK  KUP
+        不同: 体彩 SAT(桑托斯) vs 库 SAN   BOF(博塔弗戈) vs BOT   GRM(格雷米奥) vs GRE
+              体彩 VTL(维多利亚) vs 库 VIT   CHC(沙佩科) vs CHA   PAE(帕尔梅拉斯) vs PAL
+
+    所以**全等会漏掉一大半**，必须放宽到前缀。实测 2026-10-07 在售 12 场：
+    全等只能定位 7 场，前缀比 >= 2/3 能定位 10 场，且逐场人工核对全部正确。
+    """
+    a, b = (a or "").strip().upper(), (b or "").strip().upper()
+    if not a or not b:
+        return 0.0
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n / max(len(a), len(b))
+
+
+# 一对码要算「认得出这支队」的下限。2/3 是实测下限：GRM/GRE、VTL/VIT、BHA/BAH
+# 都是 0.667 且逐场核验正确；再降到 1/3 就开始把无关球队认成一支。
+MIN_CODE_SCORE = 0.66
+
+
 def load_overrides() -> dict:
     """人工兜底表：{"<销售日> <体彩编号>": fixture_id}。读不到就当空表。"""
     try:
@@ -87,7 +120,8 @@ def _candidates_between(db, lo: datetime, hi: datetime):
         SELECT f.id, f.league_name, f.date, f.home_id, f.away_id,
                f.home_name AS home_raw, f.away_name AS away_raw,
                COALESCE(th.name_zh, f.home_name) AS home_zh,
-               COALESCE(ta.name_zh, f.away_name) AS away_zh
+               COALESCE(ta.name_zh, f.away_name) AS away_zh,
+               th.code AS home_code, ta.code AS away_code
         FROM fixtures f
         LEFT JOIN teams th ON th.id = f.home_id
         LEFT JOIN teams ta ON ta.id = f.away_id
@@ -168,12 +202,64 @@ def _decide(cands: list, home_zh: str, away_zh: str,
     return {"fixture_id": best["id"], "how": tag}
 
 
+def _decide_by_code(cands: list, home_code: str, away_code: str,
+                    scope_long: str = "时间窗内") -> dict | None:
+    """队名判不出时的兜底：用体彩的英文缩写码定位。判不出返回 None。
+
+    【为什么需要】体彩给的是中文简称，库里大量队名只有拉丁名（`teams.name_zh`
+    覆盖约 44%，巴甲/芬超几乎全空）。中文比拉丁重合度恒为 0，算法在那个方向上
+    根本没有信号 —— 2026-10-07 在售 12 场里 5 场因此配不上。码是独立于语言的一路。
+
+    【为什么用前缀不用全等】见 `_code_sim`：两套缩写约定只有部分重合。
+
+    【为什么安全】这些码在**全库**层面高度歧义（`COR` 命中 6 支队、`CHA` 6 支、
+    `GRE` 6 支），但 ±10 分钟窗内通常只有 2~8 场，判别力足够。因此这里有两道闸：
+    ① 最佳得分 >= MIN_CODE_SCORE  ② 必须**严格**领先次佳（并列一律不猜）。
+    过不了就返回 None —— 宁可判不出（页面显示 null、写 overrides），也不能猜错
+    （猜错会把别场的赔率/模型挂到这场上，比 null 危险得多）。
+    """
+    hc, ac = (home_code or "").strip().upper(), (away_code or "").strip().upper()
+    if not hc and not ac:
+        return None
+
+    scored = []
+    for c in cands:
+        sh = _code_sim(hc, c["home_code"])
+        sa = _code_sim(ac, c["away_code"])
+        # (排序分, 最强单侧分, 候选)
+        scored.append((round(sh + sa, 4), round(max(sh, sa), 4), c))
+    scored.sort(key=lambda x: -x[0])
+    best_s, best_side, best = scored[0]
+    # 🔴 闸门判的是【最强单侧】，不是总和。MIN_CODE_SCORE 那 2/3 是拿单侧实测定的
+    #    （GRM/GRE 就是一侧 0.667）；若拿总和去比，两侧各只共享首字母
+    #    （各 1/3、和 0.667）也会过闸 —— 那等于「首字母同就算认得出」，太薄。
+    #    这是合成用例实测抓出来的（AZZ/DZZ vs ABC/DEF 必须拒），别改回总分。
+    if best_side < MIN_CODE_SCORE:
+        return None
+
+    second_s = scored[1][0] if len(scored) > 1 else None
+    if second_s is not None and best_s <= second_s:
+        return None
+
+    tail = f"，次佳 {second_s:.2f}" if second_s is not None else ""
+    return {"fixture_id": best["id"],
+            "how": f"队名判不出，体彩码兜底 {hc}/{ac} ≈ 库里 "
+                   f"{best['home_code']}/{best['away_code']}"
+                   f"（相似 {best_s:.2f}，{scope_long} {len(cands)} 候选{tail}）"}
+
+
 def resolve(db, home_zh: str, away_zh: str, kickoff_str: str,
-            day: str = None, num: str = None, overrides: dict = None) -> dict:
+            day: str = None, num: str = None, overrides: dict = None,
+            home_code: str = None, away_code: str = None) -> dict:
     """把一场体彩比赛解析成 fixture_id。
 
     返回 {"fixture_id": int|None, "how": str}。how 是给人看的解析依据，
     配不上时也写清楚为什么 —— 页面/日志都靠它，别静默返回 None。
+
+    三层，前一层判不出才走下一层，**下层绝不覆盖上层的成功结果**：
+        0) 人工 overrides
+        1) 队名中文重合度（_decide）
+        2) 体彩英文缩写码（_decide_by_code）—— 中文比拉丁时队名那条恒无信号
     """
     kt = _parse_kickoff(kickoff_str)
     if kt is None:
@@ -191,7 +277,16 @@ def resolve(db, home_zh: str, away_zh: str, kickoff_str: str,
         return {"fixture_id": None,
                 "how": f"库里没有（{kt:%Y-%m-%d %H:%M} 前后 {TIME_TOL}s 内 0 场）→ 是同步问题，重建映射没用"}
 
-    return _decide(cands, home_zh, away_zh)
+    r = _decide(cands, home_zh, away_zh)
+    if r["fixture_id"]:
+        return r
+
+    rc = _decide_by_code(cands, home_code, away_code)
+    if rc:
+        # 把队名那次的判词接在理由后面 —— 两条信号打架时，回溯时必须看得见另一条。
+        rc["how"] += f"；队名路线判词: {r['how']}"
+        return rc
+    return r
 
 
 def resolve_by_day(db, home_zh: str, away_zh: str, day: str,
@@ -240,6 +335,7 @@ def resolve_batch(db, matches: list, day: str) -> None:
     ov = load_overrides()
     for m in matches:
         r = resolve(db, m.get("home", ""), m.get("away", ""), m.get("kickoff", ""),
-                    day=day, num=m.get("match_num"), overrides=ov)
+                    day=day, num=m.get("match_num"), overrides=ov,
+                    home_code=m.get("home_code"), away_code=m.get("away_code"))
         m["fixture_id"] = r["fixture_id"]
         m["fixture_match"] = r["how"]

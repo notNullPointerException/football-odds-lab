@@ -139,6 +139,10 @@ def _jc_link_map(sfc_matches: list) -> list:
             norm = [{
                 "home": m.get("homeTeamAbbName", ""),
                 "away": m.get("awayTeamAbbName", ""),
+                # 与 jc.py 保持同源：队名判不出时靠这两个码兜底，缺了会让两个
+                # 页面对同一场给出不同的 fixture_id（都写 overrides 又要写两遍）
+                "home_code": m.get("homeTeamCode") or "",
+                "away_code": m.get("awayTeamCode") or "",
                 "kickoff": f"{m.get('matchDate', '')} {m.get('matchTime', '')}".strip(),
                 "match_num": m.get("matchNumStr"),
             } for m in raw_list]

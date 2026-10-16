@@ -6,8 +6,17 @@
 prob 头劣于频率基准、λ 头 ≈ 零 skill、LLM 47% —— **edge 不在预测层**。
 
 所以换一个来源：不靠模型，靠「竞彩自己定价偏」。要验证它，需要一个比竞彩准的
-基准 —— 用 Pinnacle（全球公认最锐）。本模块每天抓一次两边的价，落库攒样本，
+基准 —— 用 Pinnacle（全球公认最锐）。本模块抓两边的价、落库攒样本，
 事后回答「竞彩赔率 > 锐盘公平价」的那些腿 ROI 到底多少。
+
+🔴 **2026-10-07 起改成自动跑，每天两个时段**（`scheduler.py` 里 `odds_watch` 17:06 +
+`odds_watch_late` 22:06，两条行共用本模块的 `odds_watch_job`）。
+  ⚠️ **`uniq_key` 带「抓取分钟」，所以两次快照是两套行、并存不覆盖。**
+  做分析时**必须先去重**：同一个 `(fixture_id, market, selection)` 一天会有两条。
+  判「竞彩 vs 锐盘偏不偏」这类问题时，**样本单位是【比赛】不是【快照行】** ——
+  直接 `COUNT(*)` 会把同一场算两次，n 虚高、且两行高度相关（不是独立观测）。
+  两套行的真正用途是看**盘口移动**（也正好能解 [[football-jc-pinnacle-bias]] 里
+  「体彩是收盘价、我们库里的 Pinnacle 是预测那一刻」那个时点混杂问题）。
 
 【核心：Pinnacle 的盘口能精确还原竞彩的整数让球线】
 Pinnacle 的亚洲让球盘开的是 ±1.5/±2.5/±3.5（半一、球半），竞彩开的是整数线
@@ -68,7 +77,7 @@ _DDL = [
         fetched_at DATETIME NOT NULL COMMENT '本次抓取时间(截到分钟)',
         business_date DATE NULL COMMENT '竞彩销售日',
         kickoff_at DATETIME NULL COMMENT '开球时间',
-        fixture_id BIGINT NULL COMMENT '关联 fixtures.id(仅 jc_map 当日有值)',
+        fixture_id BIGINT NULL COMMENT '关联 fixtures.id(现场解析, jc_map.json 已废弃)',
         jc_no VARCHAR(16) NULL COMMENT '竞彩编号 如 周日018',
         match_label VARCHAR(128) NULL COMMENT '主队 vs 客队(体彩简称)',
         league VARCHAR(64) NULL,
@@ -223,8 +232,9 @@ def build_rows(payload: dict, fetch_pin: bool = True) -> tuple[list[dict], dict]
     days = payload.get("days") or []
 
     rows: list[dict] = []
+    # fetched_at 是 diagnose() 判「快照跑在 fixtures 同步之前」的基准时刻，别漏。
     stats = {"days": 0, "matches": 0, "paired": 0, "pin_fail": 0, "rows": 0,
-             "unmapped": 0, "bdates": [], "ko_list": []}
+             "unmapped": 0, "bdates": [], "ko_list": [], "fetched_at": now}
     pin_cache: dict[int, dict | None] = {}
 
     for day in days:
@@ -379,42 +389,130 @@ def collect(dry_run: bool = False, fetch_pin: bool = True) -> tuple[list[dict], 
 
 
 def diagnose(stats: dict) -> list[str]:
-    """配不上锐盘时，区分两种【完全不同】的原因 —— 混为一谈会让人白折腾。
+    """配不上锐盘时，区分【完全不同】的原因 —— 混为一谈会让人白折腾。
 
-    ① 场次不在库里 —— 该日 fixture 尚未同步，或联赛 enabled=False（如 EFL Trophy id=46）
-    ② 在库里却没配上一 —— 匹配判不出（队名对不上/窗内平手），写 overrides 即可
+    ① 快照跑的那一刻场次还没入库（fixtures 同步在后面）—— 重跑即可
+    ② 在库里却没配上一 —— 队名判不出（中文比拉丁 / 缺 name_zh）
+    ③ 该日 fixture 确实没同步 -> POST /api/scheduler/fixtures/live
 
+    判据是**按这批快照自己的开球时刻**去查库，不是「那天库里有没有比赛」。
     2026-09-24 起 fixture_id 由 jc_match_service 逐场现场解析，不再有
     「jc_map.json 过期」这一说 —— 那个分支连同它的重建建议一并删掉了。
 
-    ① 是 [[football-apifootball-limits]] 里记过的同一类现象：kickoff_matched=0 与
-    fixture_id 缺失同因同源，先看上一条再判断，别当 bug 追。
+    ⚠️ 本函数原先给 ① 写的原因全是错的，2026-10-07 实测逐条推翻：
+
+      「联赛 enabled=False（如 EFL Trophy id=46），fixtures 从未同步」
+         -> EFL Trophy 库里就有 **64 场**（2026-08-19 ~ 2026-10-14）。
+            而且 `fixture_service.sync_fixtures` 按天拉【全部】联赛，压根不看
+            enabled —— 只有 live sync 那个函数才过滤。这句错判把整轮调查引偏过。
+      真实原因是时序：2026-09-21 那两批快照 17:51 跑，而这三场 21:08 才入库，
+      差 3 小时 17 分。所以现在改成去查 created_at，把「跑早了」证出来而不是猜。
     """
     out = []
     if not stats.get("matches"):
         return ["体彩这轮没开盘（空 matchInfoList 是合法状态，深夜必现）"]
-    if stats.get("paired"):
+
+    # 判据是 unmapped，不是 paired —— paired 还会因为 fetch_pin=False 恒为 0，
+    # 那会把「没抓锐盘」误报成「配对失败」。12 场里配上 3 场同样要报，别被
+    # 「至少有一场成功」骗过去（原来那一行 `if stats.get("paired"): return`）。
+    unmapped = stats.get("unmapped") or 0
+    if not unmapped:
         return out
 
-    # 先查这些【具体开球时刻】库里有没有对手盘 —— 决定「是缺数据还是判不出」
-    near = _fixtures_near(stats.get("ko_list") or [])
-    unmapped = stats.get("unmapped") or 0
+    kos = stats.get("ko_list") or []
 
-    if not near:
-        out.append(f"{unmapped} 场配不上 fixture_id，且这些开球时刻在库里【一场都找不到】")
-        _add_cause(out, stats)
-    else:
+    # 🔴 late 必须先查，不能排在 near 后面。near 查的是【现在】的库，
+    #    复盘一轮旧快照时那些场次早就补进来了，near 恒为真 —— 会把
+    #    「跑早了」整个盖成「队名没判出来」。而 late 是专一的：只有
+    #    created_at 晚于本轮抓取时刻的行才算，正是「抓的时候还没有」的定义。
+    late = _late_sync(kos, stats.get("fetched_at"))
+    if late:
+        out.append(f"{unmapped} 场配不上 fixture_id，其中 {late} 场是【本轮抓取之后】才入库的")
+        out.append(f"  → 本轮快照跑在 fixtures 同步之前（抓取于 {stats.get('fetched_at')}），")
+        out.append("    不是匹配问题也不是数据缺失。重跑一次即可 —— uniq_key 带抓取分钟，")
+        out.append("    重跑是【新增行】不是覆盖，不会破坏本轮已有的行。")
+        out.append("  这类场次本就没进模型、也没下注，跳过不影响测量。")
+        return out
+
+    near, same_day = _probe_fixtures(kos)
+    if near:
         out.append(f"{unmapped} 场配不上 fixture_id，但其中 {near} 场的开球时刻库里其实有货")
-        out.append("  → 是匹配没判出来，不是缺数据。判据见每场的 fixture_match 字段。")
-        out.append("  → 仍判不出的写 tools/jc_overrides.json（key=\"<销售日> <体彩编号>\"）。")
+        out.append("  → 是队名没判出来，不是缺数据。判据见每场的 fixture_match 字段。")
+        out.append("  → 队名路线判词带「体彩码兜底」的，是第二层救回来的；仍判不出的写")
+        out.append("    overrides（key=\"<销售日> <体彩编号>\"，见 tools/jc_overrides.json）。")
+        return out
+
+    out.append(f"{unmapped} 场配不上 fixture_id，且这些开球时刻在库里【一场都找不到】")
+    if same_day:
+        out.append(f"  → 但其中 {same_day} 场的【当天】库里是有别的比赛的 —— 这天同步过，")
+        out.append("    只是这几个开球时刻对不上。多半是上游改了开球时间（改期/改时），")
+        out.append("    或体彩与 API-Football 的时间口径不一致。核对后写 overrides。")
+    else:
+        out.append("  → 那几天库里一场都没有。该日 fixture 还没同步：")
+        out.append("    POST /api/scheduler/fixtures/live")
+    out.append("  这类场次本就没进模型、也没下注，跳过不影响测量。")
     return out
 
 
-def _add_cause(out: list[str], stats: dict):
-    out.append("  真实原因二选一：")
-    out.append("   a) 这些场次的联赛 enabled=False（例如 EFL Trophy id=46），fixtures 从未同步")
-    out.append("   b) 该日 fixture 还没同步 -> POST /api/scheduler/fixtures/live")
-    out.append("  这类场次本就没进模型、也没下注，跳过不影响测量。")
+def _probe_fixtures(kickoffs: list) -> tuple[int, int]:
+    """(开球时刻 ±1h 内有对手盘的场数, 这些场次【当天】有比赛的场数)。
+
+    两个数合起来把「库里一场都没有」拆成三种互不相同的处境：
+        ① 时刻有货            -> 队名没判出来
+        ② 时刻没货、当天有货  -> 这天同步过，是【开球时间对不上】
+        ③ 时刻没货、当天也没货 -> 这天压根没同步
+    只报一个数就说不出 ② 和 ③ 的区别，而那两者的处置完全不同。
+
+    查不动就返回 (0, 0) —— 当不知道，别让诊断本身变成崩溃源。
+    """
+    kos = [k for k in kickoffs if k]
+    if not kos:
+        return 0, 0
+    db = SessionLocal()
+    try:
+        near = same_day = 0
+        for ko in kos:
+            if db.execute(text("SELECT COUNT(*) FROM fixtures "
+                               "WHERE date BETWEEN :lo AND :hi"),
+                          {"lo": ko - _MATCH_TOL, "hi": ko + _MATCH_TOL}).scalar() or 0:
+                near += 1
+            lo = ko.replace(hour=0, minute=0, second=0, microsecond=0)
+            if db.execute(text("SELECT COUNT(*) FROM fixtures "
+                               "WHERE date BETWEEN :lo AND :hi"),
+                          {"lo": lo, "hi": lo + timedelta(days=1)}).scalar() or 0:
+                same_day += 1
+        return near, same_day
+    except Exception as e:
+        logger.warning(f"诊断查询失败: {e}")
+        return 0, 0
+    finally:
+        db.close()
+
+
+def _late_sync(kickoffs: list, fetched_at) -> int:
+    """这些开球时刻里，有几场是【本轮抓取之后】才入库的 —— 「跑早了」的直接证据。
+
+    同时满足「现在在库里」+「created_at 晚于本次抓取」的场次，只可能是
+    「抓的时候还没同步，之后才补上」。实时跑的时候恒为 0（见 diagnose 里的说明）。
+    """
+    kos = [k for k in kickoffs if k]
+    if not kos or fetched_at is None:
+        return 0
+    db = SessionLocal()
+    try:
+        n = 0
+        for ko in kos:
+            if db.execute(text("SELECT COUNT(*) FROM fixtures "
+                               "WHERE date BETWEEN :lo AND :hi AND created_at > :fa"),
+                          {"lo": ko - _MATCH_TOL, "hi": ko + _MATCH_TOL,
+                           "fa": fetched_at}).scalar() or 0:
+                n += 1
+        return n
+    except Exception as e:
+        logger.warning(f"时序诊断查询失败: {e}")
+        return 0
+    finally:
+        db.close()
 
 
 # fixtures.date 存的就是北京时间 —— 与竞彩给的开球时间同口径，不用换算。
@@ -426,33 +524,8 @@ def _add_cause(out: list[str], stats: dict):
 _MATCH_TOL = timedelta(hours=1)
 
 
-def _fixtures_near(kickoffs: list) -> int:
-    """给定的开球时刻里，有几个能在库里找到附近的 fixture。
-
-    这才是「重建 jc_map 有没有用」的正确判据 —— 不是「那天库里有没有比赛」，
-    而是「这些【具体开球时刻】有没有对手盘」。9-23 有一场美职联不能说明
-    9-22 那三场英锦标赛配得上。
-    """
-    kos = [k for k in kickoffs if k]
-    if not kos:
-        return 0
-    db = SessionLocal()
-    try:
-        n = 0
-        for ko in kos:
-            hit = db.execute(
-                text("SELECT COUNT(*) FROM fixtures "
-                     "WHERE date BETWEEN :lo AND :hi"),
-                {"lo": ko - _MATCH_TOL, "hi": ko + _MATCH_TOL},
-            ).scalar() or 0
-            if hit:
-                n += 1
-        return n
-    except Exception as e:  # 查不动就当不知道，别把诊断本身变成崩溃源
-        logger.warning(f"诊断查询失败: {e}")
-        return 0
-    finally:
-        db.close()
+# （原先这里有个 _fixtures_near，只数「时刻有没有货」。它答不了「那这天同步过没有」，
+#   而后者才是 ② 与 ③ 的分水岭，所以 2026-10-07 并进 _probe_fixtures 一起查了。）
 
 
 def odds_watch_job(db=None):
