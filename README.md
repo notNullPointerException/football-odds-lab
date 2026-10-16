@@ -13,11 +13,6 @@
 </p>
 
 <p>
-  <strong>可视化演示站点：</strong>
-  <a href="https://www.ai7zym.online"><strong>www.ai7zym.online</strong></a>
-</p>
-
-<p>
   <strong>已完成小组赛全部比赛的数据统计与整理</strong>
 </p>
 
@@ -26,7 +21,7 @@
 </p>
 
 <p>
-  <strong>数据库原始导出文件体积较大，未上传至 GitHub 仓库；需要原始 SQL 数据的可以联系作者获取，后续会持续更新</strong>
+  <strong>数据库原始导出文件体积较大，未上传至 GitHub 仓库</strong>
 </p>
 
 <p>
@@ -47,20 +42,12 @@
 | API + CLI 双入口 | 可接入前端、机器人、自动化脚本，也可直接用命令行工具预测比赛 |
 | 赛后复盘 | 比赛结束并同步比分后，可回填预测命中情况，用于模型表现统计和策略筛选 |
 
-## 演示站点
+## 本地入口
 
 | 类型 | 地址 |
 |------|------|
-| 可视化站点 | [https://www.ai7zym.online](https://www.ai7zym.online) |
 | 本地 API 文档 | `http://127.0.0.1:8000/docs` |
 | 健康检查 | `http://127.0.0.1:8000/api/health` |
-
-## 交流与联系
-
-| QQ 联系方式 | 交流群 | 微信 |
-|:---:|:---:|:---:|
-| <img src="11.png" width="220" alt="QQ 联系方式" /> | <img src="22.png" width="220" alt="交流群" /> | <img src="33.jpg" width="220" alt="微信" /> |
-| 扫码添加 QQ | 扫码加入交流群 | 扫码添加微信 |
 
 ---
 
@@ -189,11 +176,11 @@ api-football/
 
 ### 方式一：使用 SQL 数据快速启动
 
-如果已经拿到作者提供的数据库 SQL 文件，可以直接导入后运行：
+如果已经有数据库 SQL 导出文件，可以直接导入后运行：
 
 ```bash
-git clone https://github.com/ai7zym/api-football.git
-cd api-football/backend
+git clone https://github.com/notNullPointerException/football-odds-lab.git
+cd football-odds-lab/backend
 ```
 
 创建虚拟环境：
@@ -436,7 +423,7 @@ curl -X POST http://127.0.0.1:8000/api/scheduler/backfill_pred/trigger
 
 ### SQL 文件为什么没有放到仓库？
 
-数据库原始导出文件体积较大，不适合直接提交到 GitHub。当前仓库通过 `.gitignore` 忽略 `*.sql` 文件。需要完整 SQL 数据可以联系作者获取。
+数据库原始导出文件体积较大，不适合直接提交到 GitHub。当前仓库通过 `.gitignore` 忽略 `*.sql` 文件。需要完整数据请从上游 API 重新同步。
 
 ## 安全说明
 
