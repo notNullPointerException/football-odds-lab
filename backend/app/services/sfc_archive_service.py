@@ -304,8 +304,15 @@ _ISSUE_UPSERT = """INSERT INTO sfc_issues
         first_kickoff=VALUES(first_kickoff), last_kickoff=VALUES(last_kickoff)"""
 
 # 🔴 头块（prob_*/lam_*/llm_*）走 COALESCE(旧值, 新值) = 填空白、不覆盖。
-#    其余列（对阵、赔率、彩果）一律 =VALUES() 覆盖：赔率会浮动、彩果是后来才有的，
-#    都要以最新为准。fixture_id 特殊：编不出来是 NULL，别让一次失败把已解析的 id 抹掉。
+#    理由见模块头「设计 2」：常见流程是先存档、后跑 14 场预测，写死了就永远停在 NULL。
+#
+# 🔴 其余列【都以最新为准】，但"最新"必须是【有值的最新】——所以对照写：
+#    · 会浮动的列（had_* 体彩 / mkt_* 庄家盘 / cz_* 彩果）走 COALESCE(VALUES(x), x)
+#      = 新值非空就覆盖、空则保留旧值。**不能写成裸 =VALUES(x)**：那等于"上游这次没给
+#      也照抹"，一次抽风就把之前抓到的好价清成 NULL（存档现在每天跑两枪，撞上概率不低）。
+#    · 对阵（home/away）走裸 VALUES()：这两个字段上游【永远给】，不存在"这次没给"。
+#    · fixture_id / league / match_date / kickoff_at 走 COALESCE(VALUES(x), x)：
+#      编不出来是 NULL，别让一次解析失败把已经解析好的 id 抹掉。
 _MATCH_UPSERT = """INSERT INTO sfc_issue_matches
     (issue, no, fixture_id, league, home, away, match_date, kickoff_at,
      had_h, had_d, had_a, mkt_h, mkt_d, mkt_a,
@@ -325,7 +332,8 @@ _MATCH_UPSERT = """INSERT INTO sfc_issue_matches
         kickoff_at=COALESCE(VALUES(kickoff_at), kickoff_at),
         had_h=COALESCE(VALUES(had_h), had_h), had_d=COALESCE(VALUES(had_d), had_d),
         had_a=COALESCE(VALUES(had_a), had_a),
-        mkt_h=VALUES(mkt_h), mkt_d=VALUES(mkt_d), mkt_a=VALUES(mkt_a),
+        mkt_h=COALESCE(VALUES(mkt_h), mkt_h), mkt_d=COALESCE(VALUES(mkt_d), mkt_d),
+        mkt_a=COALESCE(VALUES(mkt_a), mkt_a),
         prob_home=COALESCE(prob_home, VALUES(prob_home)),
         prob_draw=COALESCE(prob_draw, VALUES(prob_draw)),
         prob_away=COALESCE(prob_away, VALUES(prob_away)),
@@ -448,6 +456,36 @@ def archive_payload(payload: dict) -> dict:
         "with_pred": sum(1 for r in rows if r["prob_home"] is not None),
         "with_fixture": sum(1 for r in rows if r["fixture_id"]),
     }
+
+
+# ── 定时存档 ─────────────────────────────────────────────────────────────
+# 为什么要有这个 job：存档原来只绑在"打开页面"上（见 app/api/sfc.py:_archive_best_effort），
+# 而上游只返回当前期 —— 没开页面 = 这期永久空白。实测 3342 期里只有 7 期有 archived_at。
+# 页面触发【保留不动】，这里只是兜底，让"忘了开页面"不再是数据黑洞。
+def sfc_archive_job(db=None):
+    """scheduler 入口：fn(db=None) 签名，与 odds_watch_job / weekly_review_job 一致。
+
+    ⚠️ `_build_payload` 惰性 import，是刻意的：
+      · 模块级 import 会让 app.services.scheduler 把 app.api.sfc（连带 FastAPI router
+        和 app.api.jc 整套）拉进 import 图 —— tools/ 那边明确写过"不值得"。
+      · app.api.sfc 又 import 本模块，模块级 import 会成环；惰性 import 在调用期解析，无此问题。
+      · 顺带：本模块是 __init__ 无副作用的纯函数集合，惰性 import 也不拖慢冷启动。
+
+    不调 `POST /api/sfc/archive` 那个路由，尽管它做的是同一件事：
+    路由在无在售期时和真失败时都返回同一个 502，定时任务天天会撞上"无在售"这个正常状态，
+    分不清就没法告警。直接走 archive_payload() 则会干净地返回 matches=0 = 正常空操作。
+    """
+    from app.api.sfc import _build_payload       # 惰性：见 docstring
+
+    payload = _build_payload()
+    r = archive_payload(payload)
+    if not r["matches"]:
+        # 上游这一刻没有在售的期（两期之间）—— 正常状态，不是错误
+        logger.info(f"胜负彩存档: 上游无在售期，跳过 (issue={r['issue']})")
+    else:
+        logger.info(f"胜负彩存档: 期 {r['issue']} / {r['matches']} 场 "
+                    f"(有预测 {r['with_pred']}, 匹配 fixture {r['with_fixture']})")
+    return r
 
 
 # ── 读 + 判分（全部在内存里算，不落库）────────────────────────────────────

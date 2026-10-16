@@ -14,6 +14,8 @@ from app.services.prediction_result_service import backfill_results
 from app.services.auto_predict_service import auto_predict
 from app.services.bet_journal_service import weekly_review_job
 from app.services.odds_watch_service import odds_watch_job
+from app.services.sfc_archive_service import sfc_archive_job
+from app.services.sfc_history_service import sfc_result_sync_job
 
 LIVE_INTERVAL_SECONDS = 2 * 60
 
@@ -33,14 +35,49 @@ _DEFAULT_TASKS = {
     # 周复盘: scheduler 无周粒度, 用每日 09:06 触发, 非周一函数内部直接返回
     "bet_review":     {"name": "竞彩周复盘",     "start_hour": 9.1, "fn": weekly_review_job,
                        "interval_seconds": None},
-    # 竞彩/锐盘赔率快照 —— 🔴 用户 2026-09-21 定：**只在用户发话时手动抓**
-    # （同「竞彩场次由用户提供」的规矩：不自己跑、不自己推断）。
-    # 注册在这里的唯一目的是能走 HTTP 触发并留 scheduler_logs 审计：
-    #     POST /api/scheduler/odds_watch/trigger
-    # 也可以直接 .venv/bin/python tools/odds_watch.py
-    # 🔴 is_enabled=0 是**故意的**，别看到 disabled 就去 DB 里改回来。
-    "odds_watch":     {"name": "赔率快照(手动)", "start_hour": None, "fn": odds_watch_job,
-                       "interval_seconds": None, "is_enabled": 0},
+    # 竞彩/锐盘赔率快照 —— 攒 [[football-jc-pinnacle-bias]] 要判的配对样本。
+    #
+    # 【变更史，别再来回翻】
+    #   2026-09-21 用户：「算了 不要你自己抓 我会告诉你，然后你去抓」→ is_enabled=0，
+    #                        理由是他要控制什么时候动数据。当时 comment 写着「别改回 1」。
+    #   2026-10-07 用户改口：**改成自动，两个时段**。原因：fixture_id 映射修通之后，
+    #                        样本量才是唯一的瓶颈（判 1.5pp 要 ~12 场、判 1.0pp 要 ~26 场），
+    #                        手动跑必然漏天。→ 本 comment 与 [football-jc-fixtures-source]
+    #                        里那条「不自动抓」的规矩同步作废，**别再照着旧规矩改回 0**。
+    #
+    # 🔴 为什么是**两条行**而不是一条：`_run_loop` 每轮只算一个 target
+    #    （`start_hour` 是 double，DB 里也只有一个列），一个任务一天只能跑一次。
+    #    要让同一天跑两回，最省事又不碰共享 loop 逻辑（另 6 个任务在跑）的办法
+    #    就是注册两个 id、共用同一个 `odds_watch_job`。合并回一条需要给
+    #    `start_hour` 加个 list 语义 + 改 `_run_loop`，风险不值当。
+    #
+    # 两条时间都刻意避开已在跑的 08:30 / 08:41 / 09:00 / 09:05 / 09:30。
+    # 手动触发仍是 `POST /api/scheduler/odds_watch/trigger`（两条都保留）。
+    "odds_watch":       {"name": "赔率快照(傍晚)", "start_hour": 17.1, "fn": odds_watch_job,
+                         "interval_seconds": None},
+    "odds_watch_late":  {"name": "赔率快照(夜间)", "start_hour": 22.1, "fn": odds_watch_job,
+                         "interval_seconds": None},
+    # ── 胜负彩（传统足彩 14 场）两条数据链 —— 2026-10-16 加 ──────────────
+    # 之前这两件事【都没有定时任务】：存档绑在"打开胜负彩页"上、彩果靠手动跑 CLI。
+    # 代价是实测 3342 期里只有 7 期有 archived_at，而存档【漏了不可逆】
+    # （上游只返回当前期，翻期后对阵/赔率/彩果全没）。详见 sfc_archive_service 模块头。
+    #
+    # 时刻一律用 .25 —— `minute = int((start_hour % 1) * 60)`，浮点截断方向随数值变：
+    # 实测 17.1→17:06 但 9.1→09:05（注释里写的 09:06 是错的）。0.25 在二进制里精确，
+    # int(0.25*60) 恒 = 15，不给自己留差一分钟的惊喜。三条都避开了已在跑的
+    # 08:30/08:42/08:54/09:00/09:05/09:30/12:00/17:06/22:06。
+    #
+    # 🔴 存档为什么是【两条】：与 odds_watch 同理 —— `_run_loop` 每轮只算一个 target
+    #    （start_hour 是 double，DB 只有一个列），一个 id 一天只能跑一次。
+    #    两条共用 sfc_archive_job，别合并。
+    #    13:15 兜早停售的期（19:05/20:30/21:00）和当天短窗；21:15 拿停售前最近的价，
+    #    并负责把当天跑完的三头收进快照（头块是 COALESCE 填空白，先存后跑也能收）。
+    "sfc_result_sync":  {"name": "胜负彩赛果同步", "start_hour": 10.25, "fn": sfc_result_sync_job,
+                         "interval_seconds": None},
+    "sfc_archive":      {"name": "胜负彩存档(午间)", "start_hour": 13.25, "fn": sfc_archive_job,
+                         "interval_seconds": None},
+    "sfc_archive_eve":  {"name": "胜负彩存档(晚间)", "start_hour": 21.25, "fn": sfc_archive_job,
+                         "interval_seconds": None},
 }
 
 _active_loops: dict[str, asyncio.Task] = {}
@@ -257,9 +294,12 @@ async def _run_loop(task_key: str):
         sh = row.get("start_hour")
         iv = row.get("interval_seconds")
 
-        # 🔴 无 start_hour 又无 interval = 手动任务（如 odds_watch）。
+        # 🔴 纯防御闸：两个都没配的任务不能进循环。
         # 必须在这里挡住：下面 interval 分支会退化成 `delay = iv or 60`，
-        # 也就是【每 60 秒抓一次】—— 一旦被 enabled 就会打爆 sporttery。
+        # 也就是【每 60 秒抓一次】—— 一旦被 enabled 就会打爆外部接口。
+        # ⚠️ 这里原来写的例子是「手动任务（如 odds_watch）」，2026-10-07 odds_watch
+        #    改成自动（17:06 + 22:06）之后**这个例子失效了**，别再拿它当「手动任务长这样」的样板。
+        #    闸门本身仍然要留：它的作用是「配置缺失时宁可停机也不空转」，与有没有手动任务无关。
         if sh is None and iv is None:
             logger.info(f"[Scheduler] {row['name']} 是手动任务，不自动循环")
             break

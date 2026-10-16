@@ -16,6 +16,8 @@ from app.services.fixture_service import sync_fixtures, sync_live_fixtures
 from app.services.prediction_result_service import backfill_results
 from app.services.auto_predict_service import auto_predict
 from app.services.odds_watch_service import odds_watch_job
+from app.services.sfc_archive_service import sfc_archive_job
+from app.services.sfc_history_service import sfc_result_sync_job
 
 router = APIRouter()
 
@@ -28,7 +30,14 @@ TASK_MAP = {
     "fixture_live":  ("赛程实时同步", sync_live_fixtures),
     "backfill_pred": ("预测结果回填", backfill_results),
     "auto_predict":  ("赛前自动预测", auto_predict),
-    "odds_watch":    ("赔率快照(手动)", odds_watch_job),
+    "odds_watch":      ("赔率快照(傍晚)", odds_watch_job),
+    "odds_watch_late": ("赔率快照(夜间)", odds_watch_job),
+    # 🔴 这个字典和 services/scheduler.py 的 _DEFAULT_TASKS 是【两个独立的注册表】，
+    #    必须手工同步。漏登记不会影响定时跑，但 POST /scheduler/{id}/trigger 会 404
+    #    （bet_review 就是这么一直是 404 的）。新增任务记得两边都加。
+    "sfc_result_sync": ("胜负彩赛果同步", sfc_result_sync_job),
+    "sfc_archive":     ("胜负彩存档(午间)", sfc_archive_job),
+    "sfc_archive_eve": ("胜负彩存档(晚间)", sfc_archive_job),
 }
 
 
