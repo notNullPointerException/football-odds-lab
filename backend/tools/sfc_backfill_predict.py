@@ -28,9 +28,23 @@ from app.db.session import SessionLocal
 from prediction.predict import predict_fixture
 
 
-def get_missing_fixtures(db, limit_issues=30):
-    """找出最近若干期中，有 fixture_id 但 prob_home 为空的场次"""
-    rows = db.execute(text("""
+def get_missing_fixtures(db, limit_issues=30, only_future=True):
+    """找出最近若干期中，有 fixture_id 但 prob_home 为空的场次。
+    
+    only_future=True 时只返回尚未开赛的场次，避免赛后补跑造成数据泄漏。
+    """
+    future_filter = ""
+    if only_future:
+        future_filter = """
+          AND EXISTS (
+              SELECT 1 FROM fixtures f 
+              WHERE f.id = m.fixture_id 
+                AND f.status_short = 'NS'
+                AND f.date > NOW()
+          )
+        """
+    
+    rows = db.execute(text(f"""
         SELECT m.issue, m.no, m.fixture_id, m.home, m.away
         FROM sfc_issue_matches m
         WHERE m.issue IN (
@@ -47,16 +61,17 @@ def get_missing_fixtures(db, limit_issues=30):
           AND NOT EXISTS (
               SELECT 1 FROM predictions p WHERE p.fixture_id = m.fixture_id
           )
+          {future_filter}
         ORDER BY m.issue DESC, m.no
     """), {"lim": limit_issues}).fetchall()
     return rows
 
 
-def backfill(limit_issues=30, dry_run=False):
+def backfill(limit_issues=30, dry_run=False, only_future=True):
     db = SessionLocal()
     try:
-        missing = get_missing_fixtures(db, limit_issues)
-        logger.info(f"找到 {len(missing)} 场需要补预测（最近 {limit_issues} 期）")
+        missing = get_missing_fixtures(db, limit_issues, only_future=only_future)
+        logger.info(f"找到 {len(missing)} 场需要补预测（最近 {limit_issues} 期，only_future={only_future}）")
 
         if not missing:
             logger.info("没有需要补的场次")
