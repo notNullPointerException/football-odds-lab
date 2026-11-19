@@ -861,3 +861,35 @@ def _save_prediction(db, fixture, xgb, llm, odds, model_group, jc_pick=None,
         'ldr': llm.get('deep_report'), 'now': datetime.now(),
     })
     db.commit()
+
+
+    # SFC 自动回写
+    try:
+        _sync_to_sfc_if_needed(db, fixture['id'], xgb_result, llm if 'llm' in dir() else {})
+    except Exception as _e:
+        logger.warning(f"SFC auto-sync skipped: {_e}")
+
+def _sync_to_sfc_if_needed(db, fixture_id: int, xgb_result: dict, llm: dict):
+    """如果这场比赛属于某期胜负彩，把模型概率回写到 sfc_issue_matches。"""
+    from sqlalchemy import text
+    rows = db.execute(text("""
+        SELECT issue, no FROM sfc_issue_matches
+        WHERE fixture_id = :fid AND prob_home IS NULL
+        LIMIT 5
+    """), {"fid": fixture_id}).fetchall()
+    if not rows:
+        return
+    ph = xgb_result.get('win_home')
+    pd_ = xgb_result.get('win_draw')
+    pa = xgb_result.get('win_away')
+    if ph is None:
+        return
+    for issue, no in rows:
+        db.execute(text("""
+            UPDATE sfc_issue_matches
+            SET prob_home = :ph, prob_draw = :pd, prob_away = :pa,
+                updated_at = NOW()
+            WHERE issue = :issue AND no = :no AND prob_home IS NULL
+        """), {"ph": ph, "pd": pd_, "pa": pa, "issue": issue, "no": no})
+        logger.info(f"SFC sync: {issue} 第{no}场 fixture={fixture_id} prob updated")
+    db.commit()
