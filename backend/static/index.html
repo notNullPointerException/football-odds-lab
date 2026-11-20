@@ -2607,5 +2607,50 @@ document.getElementById("btn-user-center")?.addEventListener("click", async () =
 })();
 </script>
 
+
+<script>
+(function(){
+  // 关闭
+  var closeBtn = document.getElementById("btn-close-uc");
+  if(closeBtn){
+    closeBtn.onclick = function(){
+      var m = document.getElementById("user-center-modal");
+      if(m) m.style.display = "none";
+    };
+  }
+  // 登录
+  var loginBtn = document.getElementById("uc-to-login");
+  if(loginBtn){
+    loginBtn.onclick = function(){
+      var m = document.getElementById("user-center-modal");
+      if(m) m.style.display = "none";
+      var lp = document.getElementById("login-page");
+      if(lp){
+        lp.style.display = "flex";
+        lp.style.zIndex = "10000";
+      } else {
+        alert("登录页面未加载");
+      }
+    };
+  }
+  // 注册
+  var regBtn = document.getElementById("uc-to-register");
+  if(regBtn){
+    regBtn.onclick = function(){
+      var m = document.getElementById("user-center-modal");
+      if(m) m.style.display = "none";
+      var rp = document.getElementById("register-page");
+      if(rp){
+        rp.style.display = "flex";
+        rp.style.zIndex = "10000";
+        if(typeof loadRegCaptcha === "function") loadRegCaptcha();
+      } else {
+        alert("注册页面未加载");
+      }
+    };
+  }
+})();
+</script>
+
 </body>
 </html>
