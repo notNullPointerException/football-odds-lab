@@ -18,6 +18,7 @@ from app.api.scheduler import router as scheduler_router
 from app.api.predictions import router as predictions_router
 from app.api.jc import router as jc_router
 from app.api.sfc import router as sfc_router
+from app.api.auth import router as auth_router
 from app.services.scheduler import init_scheduler, shutdown_scheduler
 
 # 初始化日志
@@ -85,6 +86,7 @@ app.include_router(scheduler_router, prefix="/api", tags=["Scheduler"])
 app.include_router(predictions_router, prefix="/api", tags=["Predictions"])
 app.include_router(jc_router, prefix="/api", tags=["JC"])
 app.include_router(sfc_router, prefix="/api", tags=["SFC"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 
 
 @app.get("/api/health")

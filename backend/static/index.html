@@ -2003,5 +2003,93 @@ $("#h-cat").onchange = () => loadHistory(1);
 showNet("准备就绪 · 服务 " + location.origin);
 loadJc(false);
 </script>
+
+<!-- 登录弹窗 -->
+<div id="login-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:320px;">
+    <h3 style="margin:0 0 16px">登录 / 注册</h3>
+    <input id="login-user" placeholder="用户名" style="width:100%;margin-bottom:8px">
+    <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button class="act" id="btn-login" style="flex:1">登录</button>
+      <button class="ghost" id="btn-register" style="flex:1">注册</button>
+    </div>
+    <p id="login-msg" style="color:var(--bad);font-size:12px;margin-top:8px"></p>
+    <button class="ghost" id="btn-close-login" style="margin-top:12px;width:100%">关闭</button>
+  </div>
+</div>
+
+
+<script>
+// ── 简单前端鉴权 ──
+let _token = localStorage.getItem("token") || "";
+async function checkAuth() {
+  if (!_token) return null;
+  try {
+    const r = await fetch("/api/auth/me", { headers: { Authorization: "Bearer " + _token } });
+    if (r.ok) return await r.json();
+  } catch(e) {}
+  _token = ""; localStorage.removeItem("token");
+  return null;
+}
+function requireLogin() {
+  document.getElementById("login-modal").style.display = "flex";
+  return false;
+}
+document.getElementById("btn-close-login").onclick = () => {
+  document.getElementById("login-modal").style.display = "none";
+};
+document.getElementById("btn-login").onclick = async () => {
+  const u = document.getElementById("login-user").value.trim();
+  const p = document.getElementById("login-pass").value;
+  const r = await fetch("/api/auth/login", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({username:u, password:p})
+  });
+  const d = await r.json();
+  if (r.ok) {
+    _token = d.token; localStorage.setItem("token", _token);
+    document.getElementById("login-modal").style.display = "none";
+    alert("登录成功");
+  } else {
+    document.getElementById("login-msg").textContent = d.detail || "登录失败";
+  }
+};
+document.getElementById("btn-register").onclick = async () => {
+  const u = document.getElementById("login-user").value.trim();
+  const p = document.getElementById("login-pass").value;
+  const r = await fetch("/api/auth/register", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({username:u, password:p, days:30})
+  });
+  const d = await r.json();
+  if (r.ok) {
+    _token = d.token; localStorage.setItem("token", _token);
+    document.getElementById("login-modal").style.display = "none";
+    alert("注册成功，已登录（30天有效）");
+  } else {
+    document.getElementById("login-msg").textContent = d.detail || "注册失败";
+  }
+};
+
+// 拦截需要登录的按钮
+const _origSfcRun = document.getElementById("sfc-run")?.onclick;
+const _origSfcArchive = document.getElementById("sfc-archive")?.onclick;
+if (document.getElementById("sfc-run")) {
+  document.getElementById("sfc-run").onclick = async function() {
+    const me = await checkAuth();
+    if (!me) { requireLogin(); return; }
+    if (_origSfcRun) return _origSfcRun.call(this);
+  };
+}
+if (document.getElementById("sfc-archive")) {
+  document.getElementById("sfc-archive").onclick = async function() {
+    const me = await checkAuth();
+    if (!me) { requireLogin(); return; }
+    if (_origSfcArchive) return _origSfcArchive.call(this);
+  };
+}
+</script>
+
 </body>
 </html>
