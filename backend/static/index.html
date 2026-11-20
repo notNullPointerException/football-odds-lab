@@ -2002,6 +2002,12 @@ $("#h-cat").onchange = () => loadHistory(1);
 /* ---------------- 启动：默认落在体彩页（每天的入口） ---------------- */
 showNet("准备就绪 · 服务 " + location.origin);
 loadJc(false);
+
+document.getElementById("reg-plan-sel")?.addEventListener("change", e => {
+  const prices = {week:188, month:588, quarter:1488, year:4888};
+  document.getElementById("plan-price").textContent = "¥" + (prices[e.target.value] || 188);
+});
+
 </script>
 
 <!-- 登录弹窗 -->
@@ -2010,14 +2016,15 @@ loadJc(false);
     <h3 style="margin:0 0 16px">登录 / 注册</h3>
     <input id="login-user" placeholder="用户名" style="width:100%;margin-bottom:8px">
     <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:8px">
-    <div id="reg-months" style="display:none;margin-bottom:12px;">
-      <label style="font-size:12px;color:var(--dim)">有效期（月）</label>
-      <select id="reg-months-sel" style="width:100%;margin-top:4px">
-        <option value="1">1 个月</option>
-        <option value="3">3 个月</option>
-        <option value="6">6 个月</option>
-        <option value="12">12 个月</option>
+    <div id="reg-plans" style="display:none;margin-bottom:12px;">
+      <label style="font-size:12px;color:var(--dim)">选择套餐</label>
+      <select id="reg-plan-sel" style="width:100%;margin-top:4px">
+        <option value="week">周卡 · 1周 · ¥188</option>
+        <option value="month">月卡 · 4周 · ¥588</option>
+        <option value="quarter">季卡 · 12周 · ¥1488</option>
+        <option value="year">年卡 · 52周 · ¥4888</option>
       </select>
+      <div id="plan-price" style="margin-top:8px;font-size:18px;font-weight:600;color:var(--acc)">¥188</div>
     </div>
     <div style="display:flex;gap:8px">
       <button class="act" id="btn-login" style="flex:1">登录</button>
@@ -2045,6 +2052,9 @@ function requireLogin() {
   document.getElementById("login-modal").style.display = "flex";
   return false;
 }
+document.getElementById("btn-close-pay")?.addEventListener("click", () => {
+  document.getElementById("pay-modal").style.display = "none";
+});
 document.getElementById("btn-close-login").onclick = () => {
   document.getElementById("login-modal").style.display = "none";
 };
@@ -2065,19 +2075,21 @@ document.getElementById("btn-login").onclick = async () => {
   }
 };
 document.getElementById("btn-register").onclick = async () => {
-  document.getElementById("reg-months").style.display = "block";
+  document.getElementById("reg-plans").style.display = "block";
   const u = document.getElementById("login-user").value.trim();
   const p = document.getElementById("login-pass").value;
-  const months = parseInt(document.getElementById("reg-months-sel")?.value || "1");
+  const plan = document.getElementById("reg-plan-sel")?.value || "week";
   const r = await fetch("/api/auth/register", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({username:u, password:p, months:months})
+    body: JSON.stringify({username:u, password:p, plan:plan})
   });
   const d = await r.json();
   if (r.ok) {
     _token = d.token; localStorage.setItem("token", _token);
     document.getElementById("login-modal").style.display = "none";
-    alert("注册成功，已登录（30天有效）");
+    document.getElementById("login-modal").style.display = "none";
+    document.getElementById("pay-modal").style.display = "flex";
+    alert("注册成功，请扫码支付后联系管理员激活");
   } else {
     document.getElementById("login-msg").textContent = d.detail || "注册失败";
   }
@@ -2100,7 +2112,25 @@ if (document.getElementById("sfc-archive")) {
     if (_origSfcArchive) return _origSfcArchive.call(this);
   };
 }
+
+document.getElementById("reg-plan-sel")?.addEventListener("change", e => {
+  const prices = {week:188, month:588, quarter:1488, year:4888};
+  document.getElementById("plan-price").textContent = "¥" + (prices[e.target.value] || 188);
+});
+
 </script>
+
+
+<!-- 支付宝支付弹窗 -->
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:110;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:320px;text-align:center;">
+    <h3 style="margin:0 0 12px">请扫码支付</h3>
+    <img id="alipay-qr" src="/alipay-qr.png" alt="支付宝收款码" style="width:220px;height:220px;background:#333;border-radius:8px;">
+    <p style="margin:12px 0;font-size:14px;color:var(--dim)">支付完成后请稍等<br>或联系管理员激活</p>
+    <p style="font-size:12px;color:var(--warn)">联系方式见上方二维码</p>
+    <button class="ghost" id="btn-close-pay" style="margin-top:12px;width:100%">我已支付，关闭</button>
+  </div>
+</div>
 
 </body>
 </html>

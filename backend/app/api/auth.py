@@ -26,7 +26,15 @@ def verify_password(plain: str, hashed: str) -> bool:
 class RegisterIn(BaseModel):
     username: str
     password: str
-    months: int = 1
+    plan: str = "week"  # week / month / quarter / year
+
+# 价格表（单位：元）
+PLANS = {
+    "week":    {"weeks": 1,  "price": 188,  "label": "周卡"},
+    "month":   {"weeks": 4,  "price": 588,  "label": "月卡"},
+    "quarter": {"weeks": 12, "price": 1488, "label": "季卡"},
+    "year":    {"weeks": 52, "price": 4888, "label": "年卡"},
+}
 
 
 class LoginIn(BaseModel):
@@ -124,18 +132,20 @@ def get_current_user(
 def register(body: RegisterIn, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == body.username).first():
         raise HTTPException(400, "用户名已存在")
-    expires = datetime.utcnow() + timedelta(days=body.months * 30)
+    plan = PLANS.get(body.plan, PLANS["week"])
+    expires = datetime.utcnow() + timedelta(weeks=plan["weeks"])
     user = User(
         username=body.username,
         password_hash=hash_password(body.password),
         role="user",
+        is_active=False,  # 待激活
         expires_at=expires,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
     # 写入 Redis 倒计时
-    set_user_expiry(user.id, expires)
+    # 注册时不写 Redis，等管理员激活后再写
     token = create_token(user.id)
     return {"token": token, "user": UserOut.from_orm(user)}
 
@@ -171,3 +181,17 @@ def logout(authorization: Optional[str] = Header(None)):
         if r:
             r.delete(_token_key(token))
     return {"ok": True}
+
+@router.post("/activate")
+def activate_user(username: str, db: Session = Depends(get_db)):
+    """管理员激活用户（临时接口，后续可加权限）"""
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    if user.is_active:
+        return {"msg": "已激活"}
+    user.is_active = True
+    db.commit()
+    if user.expires_at:
+        set_user_expiry(user.id, user.expires_at)
+    return {"msg": f"已激活 {username}，到期 {user.expires_at}"}
