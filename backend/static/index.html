@@ -2278,8 +2278,16 @@ setInterval(loadTicker, 5 * 60 * 1000);
     <h3 style="margin:0 0 16px">个人中心</h3>
     <div id="uc-guest" style="display:none">
       <p style="color:var(--dim);margin-bottom:12px">请先登录</p>
-      <button class="act" id="uc-to-login" style="width:100%;margin-bottom:8px">登录</button>
-      <button class="ghost" id="uc-to-register" style="width:100%">注册</button>
+      <button class="act" id="uc-to-login" style="width:100%;margin-bottom:8px" onclick="
+      document.getElementById('user-center-modal').style.display='none';
+      var lp=document.getElementById('login-page');
+      if(lp){lp.style.display='flex';lp.style.zIndex='10000';}
+    ">登录</button>
+      <button class="ghost" id="uc-to-register" style="width:100%" onclick="
+      document.getElementById('user-center-modal').style.display='none';
+      var rp=document.getElementById('register-page');
+      if(rp){rp.style.display='flex';rp.style.zIndex='10000';}
+    ">注册</button>
     </div>
     <div id="uc-logged" style="display:none">
       <p>用户：<b id="uc-username"></b></p>
@@ -2295,7 +2303,9 @@ setInterval(loadTicker, 5 * 60 * 1000);
       </select>
       <button class="act" id="btn-recharge" style="width:100%">确认充值</button>
     </div>
-    <button class="ghost" id="btn-close-uc" style="margin-top:16px;width:100%">关闭</button>
+    <button class="ghost" id="btn-close-uc" style="margin-top:16px;width:100%" onclick="
+      document.getElementById('user-center-modal').style.display='none';
+    ">关闭</button>
   </div>
 </div>
 
