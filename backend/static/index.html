@@ -272,7 +272,7 @@
   <span class="hint" id="net" style="margin-left:auto"></span>
   <div id="user-icon-area" style="margin-left:12px;position:relative;">
     <button id="btn-user-icon" style="background:transparent;border:1px solid var(--line);color:var(--fg);padding:4px 10px;border-radius:16px;cursor:pointer;font-size:13px;">
-      👤 登录
+      ⚽️
     </button>
     <div id="user-dropdown" style="display:none;position:absolute;right:0;top:36px;background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:140px;z-index:50;padding:6px 0;">
       <div id="dd-login" style="padding:8px 14px;cursor:pointer;">登录</div>
@@ -2500,13 +2500,13 @@ document.addEventListener("click", () => { if(dropdown) dropdown.style.display =
 async function refreshUserIcon() {
   const me = await checkAuth();
   if (me) {
-    userIcon.textContent = "👤 " + me.username;
+    userIcon.textContent = "⚽️ " + me.username;
     document.getElementById("dd-login").style.display = "none";
     document.getElementById("dd-register").style.display = "none";
     document.getElementById("dd-center").style.display = "block";
     document.getElementById("dd-logout").style.display = "block";
   } else {
-    userIcon.textContent = "👤 登录";
+    userIcon.textContent = "⚽️";
     document.getElementById("dd-login").style.display = "block";
     document.getElementById("dd-register").style.display = "block";
     document.getElementById("dd-center").style.display = "none";
