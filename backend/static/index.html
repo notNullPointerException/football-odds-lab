@@ -2258,9 +2258,18 @@ document.getElementById("btn-close-uc")?.addEventListener("click", () => {
 });
 document.getElementById("uc-to-login")?.addEventListener("click", () => {
   document.getElementById("user-center-modal").style.display = "none";
+  document.getElementById("login-page").style.display = "flex";
+});
+document.getElementById("uc-to-login-old")?.addEventListener("click", () => {
+  document.getElementById("user-center-modal").style.display = "none";
   document.getElementById("login-modal").style.display = "flex";
 });
 document.getElementById("uc-to-register")?.addEventListener("click", () => {
+  document.getElementById("user-center-modal").style.display = "none";
+  document.getElementById("register-page").style.display = "flex";
+  loadRegCaptcha();
+});
+document.getElementById("uc-to-register-old")?.addEventListener("click", () => {
   document.getElementById("user-center-modal").style.display = "none";
   document.getElementById("login-modal").style.display = "flex";
   document.getElementById("reg-plans").style.display = "block";
@@ -2273,6 +2282,49 @@ document.getElementById("btn-recharge")?.addEventListener("click", () => {
   alert("请扫码支付后联系管理员激活/续费（套餐：" + plan + "）");
 });
 </script>
+
+
+<!-- 登录页面 -->
+<div id="login-page" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:340px;">
+    <h3 style="margin:0 0 20px;text-align:center">登录</h3>
+    <input id="login-user" placeholder="用户名" style="width:100%;margin-bottom:10px;padding:8px">
+    <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:16px;padding:8px">
+    <button class="act" id="btn-do-login" style="width:100%;margin-bottom:12px">登录</button>
+    <p style="text-align:center;font-size:13px;color:var(--dim)">
+      还没有账号？ <a href="#" id="to-register" style="color:var(--acc)">去注册</a>
+    </p>
+    <p id="login-msg" style="color:var(--bad);font-size:12px;margin-top:8px;text-align:center"></p>
+    <button class="ghost" id="close-login" style="margin-top:8px;width:100%">关闭</button>
+  </div>
+</div>
+
+<!-- 注册页面 -->
+<div id="register-page" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:360px;">
+    <h3 style="margin:0 0 16px;text-align:center">注册</h3>
+    <input id="reg-user" placeholder="用户名" style="width:100%;margin-bottom:8px;padding:8px">
+    <input id="reg-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:8px;padding:8px">
+    <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;">
+      <input id="reg-captcha" placeholder="验证码" style="flex:1;padding:8px">
+      <img id="reg-captcha-img" style="height:36px;border-radius:4px;cursor:pointer" title="点击刷新">
+    </div>
+    <label style="font-size:12px;color:var(--dim)">选择套餐</label>
+    <select id="reg-plan" style="width:100%;margin:4px 0 8px;padding:6px">
+      <option value="week">周卡 · 1周 · ¥188</option>
+      <option value="month">月卡 · 4周 · ¥588</option>
+      <option value="quarter">季卡 · 12周 · ¥1488</option>
+      <option value="year">年卡 · 52周 · ¥4888</option>
+    </select>
+    <div id="reg-price" style="text-align:center;font-size:20px;font-weight:600;color:var(--acc);margin-bottom:12px">¥188</div>
+    <button class="act" id="btn-do-register" style="width:100%;margin-bottom:12px">注册并支付</button>
+    <p style="text-align:center;font-size:13px;color:var(--dim)">
+      已有账号？ <a href="#" id="to-login" style="color:var(--acc)">去登录</a>
+    </p>
+    <p id="reg-msg" style="color:var(--bad);font-size:12px;margin-top:8px;text-align:center"></p>
+    <button class="ghost" id="close-register" style="margin-top:8px;width:100%">关闭</button>
+  </div>
+</div>
 
 </body>
 </html>
