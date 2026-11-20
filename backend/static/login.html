@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · AI Football</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0c10;
+  overflow: hidden;
+}
+.bg {
+  position: fixed; inset: 0;
+  background: url("/login-bg.jpg") center/cover no-repeat;
+  filter: brightness(0.45);
+  animation: kenburns 20s ease-in-out infinite alternate;
+  z-index: 0;
+}
+@keyframes kenburns {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.08) translate(-1%, -1%); }
+}
+.card {
+  position: relative;
+  z-index: 1;
+  width: 380px;
+  background: rgba(18, 20, 26, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  padding: 36px 32px;
+  color: #e6e9ef;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.card h1 {
+  text-align: center;
+  font-size: 22px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.card .sub {
+  text-align: center;
+  color: #8b93a5;
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+.tabs {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #8b93a5;
+  padding: 10px 0;
+  font-size: 15px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tabs button.on {
+  color: #4a9eff;
+  border-bottom-color: #4a9eff;
+}
+input {
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  color: #e6e9ef;
+  font-size: 14px;
+  outline: none;
+}
+input:focus { border-color: #4a9eff; }
+.captcha-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.captcha-row input { flex: 1; margin-bottom: 0; }
+.captcha-row img {
+  height: 48px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #1e222b;
+}
+.btn {
+  width: 100%;
+  padding: 12px;
+  background: #4a9eff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.btn:hover { background: #3a8eef; }
+.msg {
+  color: #f87171;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 12px;
+  min-height: 18px;
+}
+.hint {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #8b93a5;
+}
+.hint a { color: #4a9eff; cursor: pointer; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="card">
+  <h1>AI Football</h1>
+  <p class="sub">胜负彩预测控制台</p>
+  <div class="tabs">
+    <button id="tab-login" class="on">登录</button>
+    <button id="tab-register">注册</button>
+  </div>
+
+  <!-- 登录 -->
+  <div id="panel-login">
+    <input id="login-user" placeholder="用户名" maxlength="8">
+    <input id="login-pass" type="password" placeholder="密码" maxlength="12">
+    <button class="btn" id="btn-login">登录</button>
+    <p class="msg" id="login-msg"></p>
+  </div>
+
+  <!-- 注册 -->
+  <div id="panel-register" style="display:none">
+    <input id="reg-user" placeholder="用户名（最长8位）" maxlength="8">
+    <input id="reg-pass" type="password" placeholder="密码（最长12位）" maxlength="12">
+    <input id="reg-pass2" type="password" placeholder="确认密码" maxlength="12">
+    <div class="captcha-row">
+      <input id="reg-captcha" placeholder="验证码">
+      <img id="reg-captcha-img" title="点击刷新">
+    </div>
+    <button class="btn" id="btn-register">注册</button>
+    <p class="msg" id="reg-msg"></p>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+// tabs
+$("#tab-login").onclick = () => {
+  $("#tab-login").classList.add("on");
+  $("#tab-register").classList.remove("on");
+  $("#panel-login").style.display = "block";
+  $("#panel-register").style.display = "none";
+};
+$("#tab-register").onclick = () => {
+  $("#tab-register").classList.add("on");
+  $("#tab-login").classList.remove("on");
+  $("#panel-register").style.display = "block";
+  $("#panel-login").style.display = "none";
+  loadCaptcha();
+};
+
+// captcha
+async function loadCaptcha() {
+  const img = $("#reg-captcha-img");
+  if (!img) return;
+  const r = await fetch("/api/auth/captcha");
+  const cid = r.headers.get("X-Captcha-Id");
+  const blob = await r.blob();
+  img.src = URL.createObjectURL(blob);
+  img.dataset.cid = cid;
+}
+$("#reg-captcha-img").onclick = loadCaptcha;
+
+// login
+$("#btn-login").onclick = async () => {
+  const u = $("#login-user").value.trim();
+  const p = $("#login-pass").value;
+  const msg = $("#login-msg");
+  if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
+  const r = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username: u, password: p})
+  });
+  const d = await r.json();
+  if (r.ok) {
+    localStorage.setItem("token", d.token);
+    location.href = "/";
+  } else {
+    msg.textContent = d.detail || "登录失败";
+  }
+};
+
+// register
+$("#btn-register").onclick = async () => {
+  const u = $("#reg-user").value.trim();
+  const p = $("#reg-pass").value;
+  const p2 = $("#reg-pass2").value;
+  const ccode = $("#reg-captcha").value.trim();
+  const cid = $("#reg-captcha-img").dataset.cid || "";
+  const msg = $("#reg-msg");
+  if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
+  if (u.length > 8) { msg.textContent = "用户名最长8位"; return; }
+  if (p.length < 6) { msg.textContent = "密码至少6位"; return; }
+  if (p.length > 12) { msg.textContent = "密码最长12位"; return; }
+  if (p !== p2) { msg.textContent = "两次密码不一致"; return; }
+  if (/^\d+$/.test(p) || /^[a-zA-Z]+$/.test(p)) { msg.textContent = "密码需包含字母和数字"; return; }
+  if (!ccode) { msg.textContent = "请输入验证码"; return; }
+  const r = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username: u, password: p, plan: "week", captcha_id: cid, captcha_code: ccode})
+  });
+  const d = await r.json();
+  if (r.ok) {
+    alert("注册成功，请登录");
+    $("#tab-login").click();
+    $("#login-user").value = u;
+  } else {
+    msg.textContent = d.detail || "注册失败";
+    loadCaptcha();
+  }
+};
+
+// hash #register 时自动切到注册
+if (location.hash === "#register") {
+  document.getElementById("tab-register").click();
+}
+// enter key
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    if ($("#panel-login").style.display !== "none") $("#btn-login").click();
+    else $("#btn-register").click();
+  }
+});
+</script>
+</body>
+</html>

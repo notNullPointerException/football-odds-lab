@@ -257,6 +257,38 @@
   #sfc-pop .pb details{margin:10px 14px 0}
   #sfc-pop .pb pre{max-height:280px;margin-top:8px}
 </style>
+
+<script>
+// 未登录时跳转到独立登录页（电商式）
+(function(){
+  const token = localStorage.getItem("token");
+  if (!token && location.pathname !== "/login.html") {
+    // 允许游客看数据，但点操作时再跳
+  }
+  // 右上角图标点击跳登录页
+  document.addEventListener("DOMContentLoaded", () => {
+    const icon = document.getElementById("btn-user-icon");
+    if (icon) {
+      icon.onclick = async () => {
+        const me = window.checkAuth ? await window.checkAuth() : null;
+        if (me) {
+          // 已登录，打开个人中心
+          const m = document.getElementById("user-center-modal");
+          if (m) m.style.display = "flex";
+        } else {
+          location.href = "/login.html";
+        }
+      };
+    }
+    // 个人中心里的登录按钮也跳独立页
+    const ucLogin = document.getElementById("uc-to-login");
+    if (ucLogin) ucLogin.onclick = () => location.href = "/login.html";
+    const ucReg = document.getElementById("uc-to-register");
+    if (ucReg) ucReg.onclick = () => location.href = "/login.html#register";
+  });
+})();
+</script>
+
 </head>
 <body>
 
