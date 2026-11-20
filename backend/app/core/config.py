@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # 缓存
     cache_ttl: int = 3600
 
+    # Redis
+    redis_host: str = "127.0.0.1"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str = ""
+
     @property
     def db_url(self) -> str:
         return (
