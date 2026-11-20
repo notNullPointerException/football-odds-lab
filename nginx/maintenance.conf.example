@@ -1,0 +1,20 @@
+# 维护页配置示例
+# 放到你的 server 块中使用
+
+# 后端异常时返回维护页
+proxy_intercept_errors on;
+error_page 500 502 503 504 /maintenance.html;
+
+location = /maintenance.html {
+    root /usr/share/nginx/html;   # 或你实际存放 maintenance.html 的路径
+    internal;
+}
+
+# 使用示例：
+# location / {
+#     proxy_pass http://127.0.0.1:8000;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_intercept_errors on;
+#     error_page 502 503 504 /maintenance.html;
+# }
