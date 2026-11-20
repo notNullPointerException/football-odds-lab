@@ -270,6 +270,17 @@
     <button id="btn-user-center">个人中心</button>
   </nav>
   <span class="hint" id="net" style="margin-left:auto"></span>
+  <div id="user-icon-area" style="margin-left:12px;position:relative;">
+    <button id="btn-user-icon" style="background:transparent;border:1px solid var(--line);color:var(--fg);padding:4px 10px;border-radius:16px;cursor:pointer;font-size:13px;">
+      👤 登录
+    </button>
+    <div id="user-dropdown" style="display:none;position:absolute;right:0;top:36px;background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:140px;z-index:50;padding:6px 0;">
+      <div id="dd-login" style="padding:8px 14px;cursor:pointer;">登录</div>
+      <div id="dd-register" style="padding:8px 14px;cursor:pointer;">注册</div>
+      <div id="dd-center" style="padding:8px 14px;cursor:pointer;display:none;">个人中心</div>
+      <div id="dd-logout" style="padding:8px 14px;cursor:pointer;display:none;color:var(--bad);">退出登录</div>
+    </div>
+  </div>
 </header>
 
 <main>
@@ -2473,6 +2484,72 @@ if (origPay) {
 }
 setInterval(loadTicker, 5 * 60 * 1000);
 
+</script>
+
+
+<script>
+// ── 右上角用户图标 ──
+const userIcon = document.getElementById("btn-user-icon");
+const dropdown = document.getElementById("user-dropdown");
+userIcon?.addEventListener("click", e => {
+  e.stopPropagation();
+  dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
+});
+document.addEventListener("click", () => { if(dropdown) dropdown.style.display = "none"; });
+
+async function refreshUserIcon() {
+  const me = await checkAuth();
+  if (me) {
+    userIcon.textContent = "👤 " + me.username;
+    document.getElementById("dd-login").style.display = "none";
+    document.getElementById("dd-register").style.display = "none";
+    document.getElementById("dd-center").style.display = "block";
+    document.getElementById("dd-logout").style.display = "block";
+  } else {
+    userIcon.textContent = "👤 登录";
+    document.getElementById("dd-login").style.display = "block";
+    document.getElementById("dd-register").style.display = "block";
+    document.getElementById("dd-center").style.display = "none";
+    document.getElementById("dd-logout").style.display = "none";
+  }
+}
+refreshUserIcon();
+
+document.getElementById("dd-login")?.addEventListener("click", () => {
+  document.getElementById("login-page").style.display = "flex";
+  dropdown.style.display = "none";
+});
+document.getElementById("dd-register")?.addEventListener("click", () => {
+  document.getElementById("register-page").style.display = "flex";
+  if (typeof loadRegCaptcha === "function") loadRegCaptcha();
+  dropdown.style.display = "none";
+});
+document.getElementById("dd-center")?.addEventListener("click", () => {
+  document.getElementById("btn-user-center")?.click();
+  dropdown.style.display = "none";
+});
+document.getElementById("dd-logout")?.addEventListener("click", () => {
+  localStorage.removeItem("token");
+  location.reload();
+});
+
+// 确保个人中心按钮可点
+document.getElementById("btn-user-center")?.addEventListener("click", async () => {
+  const me = await checkAuth();
+  const modal = document.getElementById("user-center-modal");
+  if (!modal) return alert("个人中心组件未加载");
+  modal.style.display = "flex";
+  if (me) {
+    document.getElementById("uc-guest").style.display = "none";
+    document.getElementById("uc-logged").style.display = "block";
+    document.getElementById("uc-username").textContent = me.username || "";
+    document.getElementById("uc-role").textContent = me.role || "";
+    document.getElementById("uc-expires").textContent = me.expires_at ? String(me.expires_at).slice(0,10) : "未开通";
+  } else {
+    document.getElementById("uc-guest").style.display = "block";
+    document.getElementById("uc-logged").style.display = "none";
+  }
+});
 </script>
 
 </body>
