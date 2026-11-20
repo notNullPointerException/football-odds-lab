@@ -2279,7 +2279,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
 
 
 <!-- 个人中心 -->
-<div id="user-center-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:105;align-items:center;justify-content:center;">
+<div id="user-center-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:360px;">
     <h3 style="margin:0 0 16px">个人中心</h3>
     <div id="uc-guest" style="display:none">
@@ -2309,9 +2309,12 @@ setInterval(loadTicker, 5 * 60 * 1000);
 <script>
 // ── 个人中心 ──
 document.getElementById("btn-user-center")?.addEventListener("click", async () => {
-  const me = await checkAuth();
   const modal = document.getElementById("user-center-modal");
+  if (!modal) { alert("个人中心组件未找到"); return; }
   modal.style.display = "flex";
+  modal.style.zIndex = "9999";
+  let me = null;
+  try { me = await checkAuth(); } catch(e) { console.error(e); }
   if (me) {
     document.getElementById("uc-guest").style.display = "none";
     document.getElementById("uc-logged").style.display = "block";
