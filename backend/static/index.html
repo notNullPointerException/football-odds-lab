@@ -2113,7 +2113,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
 <script>
 // ── 简单前端鉴权 ──
 let _token = localStorage.getItem("token") || "";
-async function checkAuth() {
+window.checkAuth = async function checkAuth() {
   if (!_token) return null;
   try {
     const r = await fetch("/api/auth/me", { headers: { Authorization: "Bearer " + _token } });
@@ -2314,7 +2314,10 @@ document.getElementById("btn-user-center")?.addEventListener("click", async () =
   modal.style.display = "flex";
   modal.style.zIndex = "9999";
   let me = null;
-  try { me = await checkAuth(); } catch(e) { console.error(e); }
+  try { 
+    const fn = window.checkAuth || (typeof checkAuth === "function" ? checkAuth : null);
+    if (fn) me = await fn(); 
+  } catch(e) { console.error("checkAuth error", e); }
   if (me) {
     document.getElementById("uc-guest").style.display = "none";
     document.getElementById("uc-logged").style.display = "block";
