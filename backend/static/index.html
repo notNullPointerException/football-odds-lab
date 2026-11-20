@@ -2541,10 +2541,15 @@ document.getElementById("dd-logout")?.addEventListener("click", () => {
 
 // 确保个人中心按钮可点
 document.getElementById("btn-user-center")?.addEventListener("click", async () => {
-  const me = await checkAuth();
   const modal = document.getElementById("user-center-modal");
   if (!modal) return alert("个人中心组件未加载");
   modal.style.display = "flex";
+  modal.style.zIndex = "9999";
+  let me = null;
+  try {
+    const fn = window.checkAuth;
+    if (typeof fn === "function") me = await fn();
+  } catch(e) { console.error(e); }
   if (me) {
     document.getElementById("uc-guest").style.display = "none";
     document.getElementById("uc-logged").style.display = "block";
