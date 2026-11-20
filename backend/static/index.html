@@ -2386,9 +2386,9 @@ setInterval(loadTicker, 5 * 60 * 1000);
 <div id="register-page" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:360px;">
     <h3 style="margin:0 0 16px;text-align:center">注册</h3>
-    <input id="reg-user" placeholder="用户名" style="width:100%;margin-bottom:8px;padding:8px">
-    <input id="reg-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:8px;padding:8px">
-    <input id="reg-pass2" type="password" placeholder="确认密码" style="width:100%;margin-bottom:8px;padding:8px">
+    <input id="reg-user" placeholder="用户名（最长8位）" maxlength="8" style="width:100%;margin-bottom:8px;padding:8px">
+    <input id="reg-pass" type="password" placeholder="密码（最长12位）" maxlength="12" style="width:100%;margin-bottom:8px;padding:8px">
+    <input id="reg-pass2" type="password" placeholder="确认密码" maxlength="12" style="width:100%;margin-bottom:8px;padding:8px">
     <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
       <input id="reg-captcha" placeholder="验证码" style="flex:1;padding:8px">
       <img id="reg-captcha-img" style="height:36px;border-radius:4px;cursor:pointer" title="点击刷新">
@@ -2423,7 +2423,11 @@ document.getElementById("btn-do-register")?.addEventListener("click", async () =
   const p2 = document.getElementById("reg-pass2").value;
   const msg = document.getElementById("reg-msg");
   if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
+  if (u.length > 8) { msg.textContent = "用户名最长8位"; return; }
+  if (p.length > 12) { msg.textContent = "密码最长12位"; return; }
+  if (p.length < 6) { msg.textContent = "密码至少6位"; return; }
   if (p !== p2) { msg.textContent = "两次密码不一致"; return; }
+  if (/^\d+$/.test(p) || /^[a-zA-Z]+$/.test(p)) { msg.textContent = "密码需包含字母和数字"; return; }
   const cid = document.getElementById("reg-captcha-img")?.dataset.cid || "";
   const ccode = document.getElementById("reg-captcha").value.trim();
   if (!ccode) { msg.textContent = "请输入验证码"; return; }

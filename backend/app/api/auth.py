@@ -16,6 +16,21 @@ from app.core.redis_client import get_redis
 
 router = APIRouter()
 
+
+WEAK_PASSWORDS = {
+    "123456", "12345678", "password", "admin", "qwerty", "abc123",
+    "111111", "000000", "888888", "666666", "123123", "admin123",
+}
+
+def is_weak_password(pwd: str) -> bool:
+    if len(pwd) < 6:
+        return True
+    if pwd.lower() in WEAK_PASSWORDS:
+        return True
+    if pwd.isdigit() or pwd.isalpha():
+        return True
+    return False
+
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -179,6 +194,12 @@ def verify_captcha(cid: str, code: str) -> bool:
 
 @router.post("/register")
 def register(body: RegisterIn, db: Session = Depends(get_db)):
+    if len(body.username) > 8:
+        raise HTTPException(400, "用户名最长8位")
+    if len(body.password) > 12:
+        raise HTTPException(400, "密码最长12位")
+    if is_weak_password(body.password):
+        raise HTTPException(400, "密码太简单，请包含字母和数字，且不少于6位")
     if not verify_captcha(body.captcha_id, body.captcha_code):
         raise HTTPException(400, "验证码错误或已过期")
     existing = db.query(User).filter(User.username == body.username).first()
