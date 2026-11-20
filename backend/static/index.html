@@ -2006,10 +2006,19 @@ loadJc(false);
 
 <!-- 登录弹窗 -->
 <div id="login-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;">
-  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:320px;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:340px;">
     <h3 style="margin:0 0 16px">登录 / 注册</h3>
     <input id="login-user" placeholder="用户名" style="width:100%;margin-bottom:8px">
-    <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:12px">
+    <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:8px">
+    <div id="reg-months" style="display:none;margin-bottom:12px;">
+      <label style="font-size:12px;color:var(--dim)">有效期（月）</label>
+      <select id="reg-months-sel" style="width:100%;margin-top:4px">
+        <option value="1">1 个月</option>
+        <option value="3">3 个月</option>
+        <option value="6">6 个月</option>
+        <option value="12">12 个月</option>
+      </select>
+    </div>
     <div style="display:flex;gap:8px">
       <button class="act" id="btn-login" style="flex:1">登录</button>
       <button class="ghost" id="btn-register" style="flex:1">注册</button>
@@ -2056,11 +2065,13 @@ document.getElementById("btn-login").onclick = async () => {
   }
 };
 document.getElementById("btn-register").onclick = async () => {
+  document.getElementById("reg-months").style.display = "block";
   const u = document.getElementById("login-user").value.trim();
   const p = document.getElementById("login-pass").value;
+  const months = parseInt(document.getElementById("reg-months-sel")?.value || "1");
   const r = await fetch("/api/auth/register", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({username:u, password:p, days:30})
+    body: JSON.stringify({username:u, password:p, months:months})
   });
   const d = await r.json();
   if (r.ok) {

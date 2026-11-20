@@ -25,7 +25,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 class RegisterIn(BaseModel):
     username: str
     password: str
-    days: int = 30  # 默认 30 天
+    months: int = 1  # 默认 1 个月
 
 
 class LoginIn(BaseModel):
@@ -86,7 +86,7 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         username=body.username,
         password_hash=hash_password(body.password),
         role="user",
-        expires_at=datetime.utcnow() + timedelta(days=body.days),
+        expires_at=datetime.utcnow() + timedelta(days=body.months * 30),
     )
     db.add(user)
     db.commit()
