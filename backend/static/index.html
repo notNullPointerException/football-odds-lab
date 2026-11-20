@@ -267,6 +267,7 @@
     <button data-tab="sfc">胜负14场</button>
     <button data-tab="predict">预测</button>
     <button data-tab="history">历史预测</button>
+    <button id="btn-user-center">个人中心</button>
   </nav>
   <span class="hint" id="net" style="margin-left:auto"></span>
 </header>
@@ -2203,6 +2204,34 @@ document.getElementById("captcha-img")?.addEventListener("click", loadCaptcha);
     <p style="margin:12px 0;font-size:14px;color:var(--dim)">支付完成后请稍等<br>或联系管理员激活</p>
     <p style="font-size:12px;color:var(--warn)">联系方式见上方二维码</p>
     <button class="ghost" id="btn-close-pay" style="margin-top:12px;width:100%">我已支付，关闭</button>
+  </div>
+</div>
+
+
+<!-- 个人中心 -->
+<div id="user-center-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:105;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:360px;">
+    <h3 style="margin:0 0 16px">个人中心</h3>
+    <div id="uc-guest" style="display:none">
+      <p style="color:var(--dim);margin-bottom:12px">请先登录</p>
+      <button class="act" id="uc-to-login" style="width:100%;margin-bottom:8px">登录</button>
+      <button class="ghost" id="uc-to-register" style="width:100%">注册</button>
+    </div>
+    <div id="uc-logged" style="display:none">
+      <p>用户：<b id="uc-username"></b></p>
+      <p>角色：<span id="uc-role"></span></p>
+      <p>到期：<span id="uc-expires"></span></p>
+      <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+      <h4 style="margin:0 0 8px">充值会员</h4>
+      <select id="recharge-plan" style="width:100%;margin-bottom:8px">
+        <option value="week">周卡 · ¥188</option>
+        <option value="month">月卡 · ¥588</option>
+        <option value="quarter">季卡 · ¥1488</option>
+        <option value="year">年卡 · ¥4888</option>
+      </select>
+      <button class="act" id="btn-recharge" style="width:100%">确认充值</button>
+    </div>
+    <button class="ghost" id="btn-close-uc" style="margin-top:16px;width:100%">关闭</button>
   </div>
 </div>
 
