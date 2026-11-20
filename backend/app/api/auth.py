@@ -26,7 +26,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 class RegisterIn(BaseModel):
     username: str
     password: str
-    plan: str = "week"  # week / month / quarter / year
+    plan: str = "week"  # 注册时可不传，默认周卡占位  # week / month / quarter / year
 
 # 价格表（单位：元）
 PLANS = {
