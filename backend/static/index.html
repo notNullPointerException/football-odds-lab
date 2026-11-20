@@ -2655,5 +2655,74 @@ document.getElementById("btn-user-center")?.addEventListener("click", async () =
 })();
 </script>
 
+
+<script>
+(function(){
+  // 确保验证码在注册页打开时加载
+  var regPage = document.getElementById("register-page");
+  if(regPage){
+    var obs = new MutationObserver(function(){
+      if(regPage.style.display === "flex"){
+        var img = document.getElementById("reg-captcha-img");
+        if(img && !img.src) loadRegCaptchaSafe();
+      }
+    });
+    obs.observe(regPage, {attributes:true, attributeFilter:["style"]});
+  }
+  function loadRegCaptchaSafe(){
+    var img = document.getElementById("reg-captcha-img");
+    if(!img) return;
+    fetch("/api/auth/captcha").then(function(r){
+      var cid = r.headers.get("X-Captcha-Id");
+      return r.blob().then(function(blob){
+        img.src = URL.createObjectURL(blob);
+        img.dataset.cid = cid;
+      });
+    }).catch(function(){});
+  }
+  var imgEl = document.getElementById("reg-captcha-img");
+  if(imgEl) imgEl.onclick = loadRegCaptchaSafe;
+
+  // 注册按钮
+  var regBtn = document.getElementById("btn-do-register");
+  if(regBtn){
+    regBtn.onclick = async function(){
+      var u = (document.getElementById("reg-user")||{}).value || "";
+      var p = (document.getElementById("reg-pass")||{}).value || "";
+      var p2 = (document.getElementById("reg-pass2")||{}).value || "";
+      var ccode = (document.getElementById("reg-captcha")||{}).value || "";
+      var cid = (document.getElementById("reg-captcha-img")||{}).dataset.cid || "";
+      var msg = document.getElementById("reg-msg");
+      u = u.trim(); p = p.trim(); p2 = p2.trim(); ccode = ccode.trim();
+      if(!u || !p){ if(msg) msg.textContent = "请填写用户名和密码"; return; }
+      if(u.length > 8){ if(msg) msg.textContent = "用户名最长8位"; return; }
+      if(p.length < 6){ if(msg) msg.textContent = "密码至少6位"; return; }
+      if(p.length > 12){ if(msg) msg.textContent = "密码最长12位"; return; }
+      if(p !== p2){ if(msg) msg.textContent = "两次密码不一致"; return; }
+      if(/^\d+$/.test(p) || /^[a-zA-Z]+$/.test(p)){ if(msg) msg.textContent = "密码需包含字母和数字"; return; }
+      if(!ccode){ if(msg) msg.textContent = "请输入验证码"; return; }
+      try {
+        var r = await fetch("/api/auth/register", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({username:u, password:p, plan:"week", captcha_id:cid, captcha_code:ccode})
+        });
+        var d = await r.json();
+        if(r.ok){
+          document.getElementById("register-page").style.display = "none";
+          alert("注册成功，请登录后在个人中心充值");
+        } else {
+          if(msg) msg.textContent = d.detail || "注册失败";
+          loadRegCaptchaSafe();
+        }
+      } catch(e){
+        if(msg) msg.textContent = "网络错误";
+      }
+    };
+  }
+  // 页面加载时也尝试加载一次验证码
+  setTimeout(loadRegCaptchaSafe, 500);
+})();
+</script>
+
 </body>
 </html>
