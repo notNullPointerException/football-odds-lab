@@ -2235,5 +2235,44 @@ document.getElementById("captcha-img")?.addEventListener("click", loadCaptcha);
   </div>
 </div>
 
+
+<script>
+// ── 个人中心 ──
+document.getElementById("btn-user-center")?.addEventListener("click", async () => {
+  const me = await checkAuth();
+  const modal = document.getElementById("user-center-modal");
+  modal.style.display = "flex";
+  if (me) {
+    document.getElementById("uc-guest").style.display = "none";
+    document.getElementById("uc-logged").style.display = "block";
+    document.getElementById("uc-username").textContent = me.username;
+    document.getElementById("uc-role").textContent = me.role;
+    document.getElementById("uc-expires").textContent = me.expires_at ? me.expires_at.slice(0,10) : "永久";
+  } else {
+    document.getElementById("uc-guest").style.display = "block";
+    document.getElementById("uc-logged").style.display = "none";
+  }
+});
+document.getElementById("btn-close-uc")?.addEventListener("click", () => {
+  document.getElementById("user-center-modal").style.display = "none";
+});
+document.getElementById("uc-to-login")?.addEventListener("click", () => {
+  document.getElementById("user-center-modal").style.display = "none";
+  document.getElementById("login-modal").style.display = "flex";
+});
+document.getElementById("uc-to-register")?.addEventListener("click", () => {
+  document.getElementById("user-center-modal").style.display = "none";
+  document.getElementById("login-modal").style.display = "flex";
+  document.getElementById("reg-plans").style.display = "block";
+  if (typeof loadCaptcha === "function") loadCaptcha();
+});
+document.getElementById("btn-recharge")?.addEventListener("click", () => {
+  const plan = document.getElementById("recharge-plan").value;
+  document.getElementById("user-center-modal").style.display = "none";
+  document.getElementById("pay-modal").style.display = "flex";
+  alert("请扫码支付后联系管理员激活/续费（套餐：" + plan + "）");
+});
+</script>
+
 </body>
 </html>
