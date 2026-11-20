@@ -2243,13 +2243,7 @@ async function loadTicker() {
   } catch(e) {}
 }
 // 打开支付弹窗时加载，并每5分钟刷新
-const origPay = document.getElementById("pay-modal");
-if (origPay) {
-  const observer = new MutationObserver(() => {
-    if (origPay.style.display === "flex") loadTicker();
-  });
-  observer.observe(origPay, { attributes: true, attributeFilter: ["style"] });
-}
+
 setInterval(loadTicker, 5 * 60 * 1000);
 
 </script>
@@ -2372,13 +2366,7 @@ async function loadTicker() {
   } catch(e) {}
 }
 // 打开支付弹窗时加载，并每5分钟刷新
-const origPay = document.getElementById("pay-modal");
-if (origPay) {
-  const observer = new MutationObserver(() => {
-    if (origPay.style.display === "flex") loadTicker();
-  });
-  observer.observe(origPay, { attributes: true, attributeFilter: ["style"] });
-}
+
 setInterval(loadTicker, 5 * 60 * 1000);
 
 </script>
@@ -2481,13 +2469,7 @@ async function loadTicker() {
   } catch(e) {}
 }
 // 打开支付弹窗时加载，并每5分钟刷新
-const origPay = document.getElementById("pay-modal");
-if (origPay) {
-  const observer = new MutationObserver(() => {
-    if (origPay.style.display === "flex") loadTicker();
-  });
-  observer.observe(origPay, { attributes: true, attributeFilter: ["style"] });
-}
+
 setInterval(loadTicker, 5 * 60 * 1000);
 
 </script>
@@ -2504,7 +2486,8 @@ userIcon?.addEventListener("click", e => {
 document.addEventListener("click", () => { if(dropdown) dropdown.style.display = "none"; });
 
 async function refreshUserIcon() {
-  const me = await checkAuth();
+  let me = null;
+  try { if (window.checkAuth) me = await window.checkAuth(); } catch(e) {}
   if (me) {
     userIcon.textContent = "⚽️ " + me.username;
     document.getElementById("dd-login").style.display = "none";
