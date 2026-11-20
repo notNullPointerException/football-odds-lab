@@ -2026,6 +2026,22 @@ document.getElementById("login-user")?.addEventListener("blur", async () => {
   } catch(e) {}
 });
 
+
+async function loadCaptcha() {
+  const img = document.getElementById("captcha-img");
+  if (!img) return;
+  const r = await fetch("/api/auth/captcha");
+  const cid = r.headers.get("X-Captcha-Id");
+  const blob = await r.blob();
+  img.src = URL.createObjectURL(blob);
+  img.dataset.cid = cid;
+  document.getElementById("captcha-box").style.display = "flex";
+}
+document.getElementById("btn-register")?.addEventListener("click", () => {
+  if (!document.getElementById("captcha-img")?.src) loadCaptcha();
+});
+document.getElementById("captcha-img")?.addEventListener("click", loadCaptcha);
+
 </script>
 
 <!-- 登录弹窗 -->
@@ -2034,6 +2050,10 @@ document.getElementById("login-user")?.addEventListener("blur", async () => {
     <h3 style="margin:0 0 16px">登录 / 注册</h3>
     <input id="login-user" placeholder="用户名" style="width:100%;margin-bottom:8px">
     <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:8px">
+    <div id="captcha-box" style="display:none;margin-bottom:8px;display:flex;gap:8px;align-items:center;">
+      <input id="captcha-code" placeholder="验证码" style="flex:1">
+      <img id="captcha-img" style="height:36px;border-radius:4px;cursor:pointer" title="点击刷新">
+    </div>
     <div id="reg-plans" style="display:none;margin-bottom:12px;">
       <label style="font-size:12px;color:var(--dim)">选择套餐</label>
       <select id="reg-plan-sel" style="width:100%;margin-top:4px">
@@ -2097,9 +2117,11 @@ document.getElementById("btn-register").onclick = async () => {
   const u = document.getElementById("login-user").value.trim();
   const p = document.getElementById("login-pass").value;
   const plan = document.getElementById("reg-plan-sel")?.value || "week";
+  const cid = document.getElementById("captcha-img")?.dataset.cid || "";
+  const ccode = document.getElementById("captcha-code")?.value.trim() || "";
   const r = await fetch("/api/auth/register", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({username:u, password:p, plan:plan})
+    body: JSON.stringify({username:u, password:p, plan:plan, captcha_id:cid, captcha_code:ccode})
   });
   const d = await r.json();
   if (r.ok) {
@@ -2153,6 +2175,22 @@ document.getElementById("login-user")?.addEventListener("blur", async () => {
     }
   } catch(e) {}
 });
+
+
+async function loadCaptcha() {
+  const img = document.getElementById("captcha-img");
+  if (!img) return;
+  const r = await fetch("/api/auth/captcha");
+  const cid = r.headers.get("X-Captcha-Id");
+  const blob = await r.blob();
+  img.src = URL.createObjectURL(blob);
+  img.dataset.cid = cid;
+  document.getElementById("captcha-box").style.display = "flex";
+}
+document.getElementById("btn-register")?.addEventListener("click", () => {
+  if (!document.getElementById("captcha-img")?.src) loadCaptcha();
+});
+document.getElementById("captcha-img")?.addEventListener("click", loadCaptcha);
 
 </script>
 

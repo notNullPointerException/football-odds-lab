@@ -128,8 +128,59 @@ def get_current_user(
     return user
 
 
+
+import io
+import random
+import string
+from fastapi.responses import Response
+from PIL import Image, ImageDraw, ImageFont
+
+def _captcha_key(cid: str) -> str:
+    return f"captcha:{cid}"
+
+@router.get("/captcha")
+def get_captcha():
+    """生成图形验证码，返回图片 + captcha_id"""
+    code = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    cid = secrets.token_urlsafe(8)
+    r = get_redis()
+    if r:
+        r.setex(_captcha_key(cid), 300, code.lower())  # 5分钟有效
+    # 生成图片
+    img = Image.new("RGB", (120, 40), color=(30, 34, 43))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+    except:
+        font = ImageFont.load_default()
+    for i, ch in enumerate(code):
+        draw.text((10 + i*26, 6), ch, fill=(230, 233, 239), font=font)
+    # 干扰线
+    for _ in range(3):
+        draw.line([(random.randint(0,120), random.randint(0,40)),
+                   (random.randint(0,120), random.randint(0,40))], fill=(74,158,255), width=1)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png",
+                    headers={"X-Captcha-Id": cid})
+
+def verify_captcha(cid: str, code: str) -> bool:
+    if not cid or not code:
+        return False
+    r = get_redis()
+    if not r:
+        return True  # Redis 不可用时放行
+    stored = r.get(_captcha_key(cid))
+    if stored and stored == code.lower().strip():
+        r.delete(_captcha_key(cid))
+        return True
+    return False
+
+
 @router.post("/register")
 def register(body: RegisterIn, db: Session = Depends(get_db)):
+    if not verify_captcha(body.captcha_id, body.captcha_code):
+        raise HTTPException(400, "验证码错误或已过期")
     existing = db.query(User).filter(User.username == body.username).first()
     if existing:
         raise HTTPException(400, "用户名已存在，请换一个")
