@@ -2563,5 +2563,49 @@ document.getElementById("btn-user-center")?.addEventListener("click", async () =
 });
 </script>
 
+
+<script>
+(function(){
+  function openCenter(){
+    var m = document.getElementById("user-center-modal");
+    if(!m){ alert("个人中心未加载"); return; }
+    m.style.display = "flex";
+    m.style.zIndex = "99999";
+    var guest = document.getElementById("uc-guest");
+    var logged = document.getElementById("uc-logged");
+    if(guest) guest.style.display = "block";
+    if(logged) logged.style.display = "none";
+    // try load user
+    var token = localStorage.getItem("token");
+    if(token && window.checkAuth){
+      window.checkAuth().then(function(me){
+        if(me){
+          if(guest) guest.style.display = "none";
+          if(logged) logged.style.display = "block";
+          var u = document.getElementById("uc-username");
+          var r = document.getElementById("uc-role");
+          var e = document.getElementById("uc-expires");
+          if(u) u.textContent = me.username || "";
+          if(r) r.textContent = me.role || "";
+          if(e) e.textContent = me.expires_at ? String(me.expires_at).slice(0,10) : "未开通";
+        }
+      }).catch(function(){});
+    }
+  }
+  var btn = document.getElementById("btn-user-center");
+  if(btn){
+    btn.onclick = openCenter;
+  }
+  // also bind close
+  var closeBtn = document.getElementById("btn-close-uc");
+  if(closeBtn){
+    closeBtn.onclick = function(){
+      var m = document.getElementById("user-center-modal");
+      if(m) m.style.display = "none";
+    };
+  }
+})();
+</script>
+
 </body>
 </html>
