@@ -2008,6 +2008,24 @@ document.getElementById("reg-plan-sel")?.addEventListener("change", e => {
   document.getElementById("plan-price").textContent = "¥" + (prices[e.target.value] || 188);
 });
 
+
+// 用户名唯一性实时校验
+document.getElementById("login-user")?.addEventListener("blur", async () => {
+  const u = document.getElementById("login-user").value.trim();
+  if (!u || u.length < 2) return;
+  try {
+    const r = await fetch("/api/auth/check-username?username=" + encodeURIComponent(u));
+    const d = await r.json();
+    const msg = document.getElementById("login-msg");
+    if (!d.available) {
+      msg.textContent = "用户名已存在";
+      msg.style.color = "var(--bad)";
+    } else {
+      msg.textContent = "";
+    }
+  } catch(e) {}
+});
+
 </script>
 
 <!-- 登录弹窗 -->
@@ -2116,6 +2134,24 @@ if (document.getElementById("sfc-archive")) {
 document.getElementById("reg-plan-sel")?.addEventListener("change", e => {
   const prices = {week:188, month:588, quarter:1488, year:4888};
   document.getElementById("plan-price").textContent = "¥" + (prices[e.target.value] || 188);
+});
+
+
+// 用户名唯一性实时校验
+document.getElementById("login-user")?.addEventListener("blur", async () => {
+  const u = document.getElementById("login-user").value.trim();
+  if (!u || u.length < 2) return;
+  try {
+    const r = await fetch("/api/auth/check-username?username=" + encodeURIComponent(u));
+    const d = await r.json();
+    const msg = document.getElementById("login-msg");
+    if (!d.available) {
+      msg.textContent = "用户名已存在";
+      msg.style.color = "var(--bad)";
+    } else {
+      msg.textContent = "";
+    }
+  } catch(e) {}
 });
 
 </script>

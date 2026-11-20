@@ -130,8 +130,9 @@ def get_current_user(
 
 @router.post("/register")
 def register(body: RegisterIn, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == body.username).first():
-        raise HTTPException(400, "用户名已存在")
+    existing = db.query(User).filter(User.username == body.username).first()
+    if existing:
+        raise HTTPException(400, "用户名已存在，请换一个")
     plan = PLANS.get(body.plan, PLANS["week"])
     expires = datetime.utcnow() + timedelta(weeks=plan["weeks"])
     user = User(
@@ -195,3 +196,9 @@ def activate_user(username: str, db: Session = Depends(get_db)):
     if user.expires_at:
         set_user_expiry(user.id, user.expires_at)
     return {"msg": f"已激活 {username}，到期 {user.expires_at}"}
+
+@router.get("/check-username")
+def check_username(username: str, db: Session = Depends(get_db)):
+    """检查用户名是否可用"""
+    exists = db.query(User).filter(User.username == username).first() is not None
+    return {"available": not exists, "username": username}
