@@ -2390,7 +2390,12 @@ setInterval(loadTicker, 5 * 60 * 1000);
     <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:16px;padding:8px">
     <button class="act" id="btn-do-login" style="width:100%;margin-bottom:12px">登录</button>
     <p style="text-align:center;font-size:13px;color:var(--dim)">
-      还没有账号？ <a href="#" id="to-register" style="color:var(--acc)">去注册</a>
+      还没有账号？ <a href="#" id="to-register" style="color:var(--acc)" onclick="
+  event.preventDefault();
+  document.getElementById('login-page').style.display='none';
+  var rp=document.getElementById('register-page');
+  if(rp){rp.style.display='flex';rp.style.zIndex='10000';}
+">去注册</a>
     </p>
     <p id="login-msg" style="color:var(--bad);font-size:12px;margin-top:8px;text-align:center"></p>
     <button class="ghost" id="close-login" style="margin-top:8px;width:100%">关闭</button>
@@ -2410,7 +2415,12 @@ setInterval(loadTicker, 5 * 60 * 1000);
     </div>
     <button class="act" id="btn-do-register" style="width:100%;margin-bottom:12px">注册</button>
     <p style="text-align:center;font-size:13px;color:var(--dim)">
-      已有账号？ <a href="#" id="to-login" style="color:var(--acc)">去登录</a>
+      已有账号？ <a href="#" id="to-login" style="color:var(--acc)" onclick="
+  event.preventDefault();
+  document.getElementById('register-page').style.display='none';
+  var lp=document.getElementById('login-page');
+  if(lp){lp.style.display='flex';lp.style.zIndex='10000';}
+">去登录</a>
     </p>
     <p id="reg-msg" style="color:var(--bad);font-size:12px;margin-top:8px;text-align:center"></p>
     <button class="ghost" id="close-register" style="margin-top:8px;width:100%">关闭</button>
