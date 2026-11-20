@@ -162,18 +162,18 @@ def get_captcha():
     if r:
         r.setex(_captcha_key(cid), 300, code.lower())  # 5分钟有效
     # 生成图片
-    img = Image.new("RGB", (120, 40), color=(30, 34, 43))
+    img = Image.new("RGB", (160, 56), color=(30, 34, 43))
     draw = ImageDraw.Draw(img)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
     except:
         font = ImageFont.load_default()
     for i, ch in enumerate(code):
-        draw.text((10 + i*26, 6), ch, fill=(230, 233, 239), font=font)
+        draw.text((12 + i*36, 8), ch, fill=(230, 233, 239), font=font)
     # 干扰线
     for _ in range(3):
-        draw.line([(random.randint(0,120), random.randint(0,40)),
-                   (random.randint(0,120), random.randint(0,40))], fill=(74,158,255), width=1)
+        draw.line([(random.randint(0,160), random.randint(0,56)),
+                   (random.randint(0,160), random.randint(0,56))], fill=(74,158,255), width=1)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png",
