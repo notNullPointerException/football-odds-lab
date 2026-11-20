@@ -2043,6 +2043,30 @@ document.getElementById("btn-register")?.addEventListener("click", () => {
 });
 document.getElementById("captcha-img")?.addEventListener("click", loadCaptcha);
 
+
+async function loadTicker() {
+  try {
+    const r = await fetch("/api/auth/recharge-ticker");
+    const data = await r.json();
+    const inner = document.getElementById("ticker-inner");
+    if (!inner || !data.length) return;
+    const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
+    const html = data.map(d => 
+      `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`
+    ).join("　　");
+    inner.textContent = html + "　　" + html;  // 循环
+  } catch(e) {}
+}
+// 打开支付弹窗时加载，并每5分钟刷新
+const origPay = document.getElementById("pay-modal");
+if (origPay) {
+  const observer = new MutationObserver(() => {
+    if (origPay.style.display === "flex") loadTicker();
+  });
+  observer.observe(origPay, { attributes: true, attributeFilter: ["style"] });
+}
+setInterval(loadTicker, 5 * 60 * 1000);
+
 </script>
 
 <!-- 登录弹窗 -->
@@ -2193,6 +2217,30 @@ document.getElementById("btn-register")?.addEventListener("click", () => {
 });
 document.getElementById("captcha-img")?.addEventListener("click", loadCaptcha);
 
+
+async function loadTicker() {
+  try {
+    const r = await fetch("/api/auth/recharge-ticker");
+    const data = await r.json();
+    const inner = document.getElementById("ticker-inner");
+    if (!inner || !data.length) return;
+    const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
+    const html = data.map(d => 
+      `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`
+    ).join("　　");
+    inner.textContent = html + "　　" + html;  // 循环
+  } catch(e) {}
+}
+// 打开支付弹窗时加载，并每5分钟刷新
+const origPay = document.getElementById("pay-modal");
+if (origPay) {
+  const observer = new MutationObserver(() => {
+    if (origPay.style.display === "flex") loadTicker();
+  });
+  observer.observe(origPay, { attributes: true, attributeFilter: ["style"] });
+}
+setInterval(loadTicker, 5 * 60 * 1000);
+
 </script>
 
 
@@ -2200,6 +2248,17 @@ document.getElementById("captcha-img")?.addEventListener("click", loadCaptcha);
 <div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:110;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:320px;text-align:center;">
     <h3 style="margin:0 0 12px">请扫码支付</h3>
+
+<div id="recharge-ticker" style="height:28px;overflow:hidden;background:rgba(74,158,255,.1);border-radius:6px;margin-bottom:12px;font-size:12px;line-height:28px;padding:0 8px;color:var(--dim);">
+  <div id="ticker-inner" style="white-space:nowrap;animation:ticker 20s linear infinite;"></div>
+</div>
+<style>
+@keyframes ticker {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+</style>
+
     <img id="alipay-qr" src="/alipay-qr.png" alt="支付宝收款码" style="width:220px;height:220px;background:#333;border-radius:8px;">
     <p style="margin:12px 0;font-size:14px;color:var(--dim)">支付完成后请稍等<br>或联系管理员激活</p>
     <p style="font-size:12px;color:var(--warn)">联系方式见上方二维码</p>
@@ -2281,6 +2340,30 @@ document.getElementById("btn-recharge")?.addEventListener("click", () => {
   document.getElementById("pay-modal").style.display = "flex";
   alert("请扫码支付后联系管理员激活/续费（套餐：" + plan + "）");
 });
+
+async function loadTicker() {
+  try {
+    const r = await fetch("/api/auth/recharge-ticker");
+    const data = await r.json();
+    const inner = document.getElementById("ticker-inner");
+    if (!inner || !data.length) return;
+    const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
+    const html = data.map(d => 
+      `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`
+    ).join("　　");
+    inner.textContent = html + "　　" + html;  // 循环
+  } catch(e) {}
+}
+// 打开支付弹窗时加载，并每5分钟刷新
+const origPay = document.getElementById("pay-modal");
+if (origPay) {
+  const observer = new MutationObserver(() => {
+    if (origPay.style.display === "flex") loadTicker();
+  });
+  observer.observe(origPay, { attributes: true, attributeFilter: ["style"] });
+}
+setInterval(loadTicker, 5 * 60 * 1000);
+
 </script>
 
 
@@ -2362,6 +2445,30 @@ const origToReg = document.getElementById("to-register");
 if (origToReg) {
   origToReg.addEventListener("click", () => setTimeout(loadRegCaptcha, 100));
 }
+
+async function loadTicker() {
+  try {
+    const r = await fetch("/api/auth/recharge-ticker");
+    const data = await r.json();
+    const inner = document.getElementById("ticker-inner");
+    if (!inner || !data.length) return;
+    const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
+    const html = data.map(d => 
+      `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`
+    ).join("　　");
+    inner.textContent = html + "　　" + html;  // 循环
+  } catch(e) {}
+}
+// 打开支付弹窗时加载，并每5分钟刷新
+const origPay = document.getElementById("pay-modal");
+if (origPay) {
+  const observer = new MutationObserver(() => {
+    if (origPay.style.display === "flex") loadTicker();
+  });
+  observer.observe(origPay, { attributes: true, attributeFilter: ["style"] });
+}
+setInterval(loadTicker, 5 * 60 * 1000);
+
 </script>
 
 </body>

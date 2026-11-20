@@ -253,3 +253,27 @@ def check_username(username: str, db: Session = Depends(get_db)):
     """检查用户名是否可用"""
     exists = db.query(User).filter(User.username == username).first() is not None
     return {"available": not exists, "username": username}
+
+
+from app.models.recharge_log import RechargeLog
+import random
+
+@router.get("/recharge-ticker")
+def recharge_ticker(db: Session = Depends(get_db)):
+    """随机返回 30 条充值记录用于滚动条"""
+    total = db.query(RechargeLog).count()
+    if total == 0:
+        return []
+    # 随机取 30 条
+    ids = [r[0] for r in db.query(RechargeLog.id).all()]
+    sample = random.sample(ids, min(30, len(ids)))
+    rows = db.query(RechargeLog).filter(RechargeLog.id.in_(sample)).order_by(RechargeLog.created_at.desc()).all()
+    return [
+        {
+            "username": r.username,
+            "plan": r.plan,
+            "amount": float(r.amount),
+            "time": r.created_at.strftime("%m-%d %H:%M") if r.created_at else "",
+        }
+        for r in rows
+    ]
