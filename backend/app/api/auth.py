@@ -295,7 +295,7 @@ def get_captcha(request: Request):
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png",
-                    headers={"X-Captcha-Id": cid})
+                    headers={"X-Captcha-Id": cid, "Access-Control-Expose-Headers": "X-Captcha-Id"})
 
 def verify_captcha(cid: str, code: str) -> bool:
     if not cid or not code:
@@ -320,6 +320,7 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(400, "密码最长12位")
     if is_weak_password(body.password):
         raise HTTPException(400, "密码太简单，请包含字母和数字，且不少于6位")
+    print(f"[login] captcha_id={body.captcha_id}, code={body.captcha_code}")
     if not verify_captcha(body.captcha_id, body.captcha_code):
         raise HTTPException(400, "验证码错误或已过期")
     existing = db.query(User).filter(User.username == body.username).first()
