@@ -117,16 +117,29 @@ async function loadUser() {
     $("#uc-username").textContent = me.username || "-";
     $("#uc-role").textContent = me.role || "-";
     const expEl = $("#uc-expires");
-    if (me.role === "admin") {
+    if (me.role === "admin" || !me.expires_at) {
       expEl.textContent = "无限制";
       expEl.style.color = "#f87171";
-      document.querySelector(".card:last-of-type").style.display = "none";
-    } else if (!me.expires_at) {
-      expEl.textContent = "无限制";
-      expEl.style.color = "#f87171";
+      if (me.role === "admin") document.querySelector(".card:last-of-type").style.display = "none";
     } else {
-      expEl.textContent = String(me.expires_at).slice(0,10);
-      expEl.style.color = "";
+      // 倒计时
+      const exp = new Date(me.expires_at);
+      function updateCountdown() {
+        const now = new Date();
+        const diff = exp - now;
+        if (diff <= 0) {
+          expEl.textContent = "已过期";
+          expEl.style.color = "#f87171";
+          return;
+        }
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        expEl.textContent = d + "天 " + h + "小时 " + m + "分";
+        expEl.style.color = d < 3 ? "#f87171" : "#4ade80";
+      }
+      updateCountdown();
+      setInterval(updateCountdown, 60000);
     }
   } catch(e) {
     location.href = "/login.html";
