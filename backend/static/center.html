@@ -73,15 +73,8 @@ select {
   white-space: nowrap;
   display: inline-block;
 }
-.ticker-inner.scrolling {
-  animation: scrollAcross 8s linear forwards;
-}
-@keyframes scrollAcross {
-  0% { transform: translateX(-100%); }
-  10% { transform: translateX(0); }
-  90% { transform: translateX(0); }
-  100% { transform: translateX(100%); }
-}
+
+
 .back { color: #4a9eff; cursor: pointer; }
 </style>
 </head>
@@ -92,9 +85,10 @@ select {
   
 </div>
 <div class="container" style="position:relative;">
-  <a href="/" style="position:absolute;top:-8px;right:20px;font-size:22px;color:#8b93a5;text-decoration:none;z-index:10;">✕</a>
-  <div class="ticker" id="ticker">
+  
+  <div class="ticker" id="ticker" style="position:relative;">
     <div class="ticker-inner" id="ticker-inner">加载中…</div>
+    <a href="/" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#8b93a5;text-decoration:none;z-index:10;">✕</a>
   </div>
 
   <div class="card" id="user-card">
@@ -191,10 +185,17 @@ function showNextTicker() {
   const d = tickerData[tickerIndex % tickerData.length];
   const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
   const inner = $("#ticker-inner");
-  inner.classList.remove("scrolling");
-  inner.textContent = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
-  void inner.offsetWidth;
-  inner.classList.add("scrolling");
+  const fullText = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
+  inner.textContent = "";
+  let i = 0;
+  const type = () => {
+    if (i < fullText.length) {
+      inner.textContent += fullText[i];
+      i++;
+      setTimeout(type, 80);
+    }
+  };
+  type();
   tickerIndex++;
   // 第一条 5 秒，前几条 10-60 秒，之后 2-3 分钟
   let delay;
