@@ -2698,8 +2698,9 @@ document.addEventListener("click", () => { if(dropdown) dropdown.style.display =
 
 async function refreshUserIcon() {
   let me = null;
+  const token = localStorage.getItem("token");
   try { if (window.checkAuth) me = await window.checkAuth(); } catch(e) {}
-  if (me) {
+  if (me || token) {
     userIcon.textContent = "⚽️ " + me.username;
     document.getElementById("dd-login").style.display = "none";
     document.getElementById("dd-register").style.display = "none";
@@ -2731,7 +2732,7 @@ document.getElementById("dd-center")?.addEventListener("click", () => {
 });
 document.getElementById("dd-logout")?.addEventListener("click", () => {
   localStorage.removeItem("token");
-  location.reload();
+  location.href = "/login.html";
 });
 
 // 确保个人中心按钮可点
