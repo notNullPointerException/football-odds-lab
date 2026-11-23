@@ -2807,7 +2807,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
   }
   var btn = document.getElementById("btn-user-center");
   if(btn){
-    btn.onclick = openCenter;
+    btn.onclick = function(){ location.href = "/center.html"; };
   }
   // also bind close
   var closeBtn = document.getElementById("btn-close-uc");
