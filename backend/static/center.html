@@ -55,30 +55,29 @@ select {
 }
 .btn:hover { background: #3a8eef; }
 .ticker {
-  height: 36px;
+  height: 48px;
   overflow: hidden;
-  background: rgba(74,158,255,.08);
-  border-radius: 8px;
-  margin-bottom: 20px;
-  font-size: 13px;
-  line-height: 36px;
-  padding: 0 12px;
-  color: #8b93a5;
+  background: rgba(74,158,255,.1);
+  border-radius: 10px;
+  margin-bottom: 24px;
+  font-size: 15px;
+  line-height: 48px;
+  padding: 0 20px;
+  color: #a0a8b8;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .ticker-inner {
   white-space: nowrap;
-  animation: ticker 25s linear infinite;
-}
-@keyframes ticker {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  transition: opacity 0.3s;
 }
 .back { color: #4a9eff; cursor: pointer; }
 </style>
 </head>
 <body>
 <div class="header">
-  <a href="/" class="back">← 返回</a>
+  <a href="/" class="back" style="font-size:16px;color:#4a9eff;font-weight:500;">← 返回</a>
   <h1>个人中心</h1>
 </div>
 <div class="container">
@@ -126,18 +125,33 @@ async function loadUser() {
   }
 }
 
+let tickerData = [];
+let tickerIndex = 0;
 async function loadTicker() {
   try {
     const r = await fetch("/api/auth/recharge-ticker");
-    const data = await r.json();
-    const inner = $("#ticker-inner");
-    if (!data || !data.length) { inner.textContent = "暂无充值动态"; return; }
-    const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
-    const html = data.map(d => `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`).join("　　");
-    inner.textContent = html + "　　" + html;
+    tickerData = await r.json() || [];
+    if (!tickerData.length) {
+      $("#ticker-inner").textContent = "暂无充值动态";
+      return;
+    }
+    // 打乱顺序
+    tickerData.sort(() => Math.random() - 0.5);
+    tickerIndex = 0;
+    showNextTicker();
   } catch(e) {
     $("#ticker-inner").textContent = "加载失败";
   }
+}
+function showNextTicker() {
+  if (!tickerData.length) return;
+  const d = tickerData[tickerIndex % tickerData.length];
+  const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
+  $("#ticker-inner").textContent = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
+  tickerIndex++;
+  // 第一条 5 秒后出现下一条，之后随机 10-20 秒
+  const delay = tickerIndex === 1 ? 5000 : (10000 + Math.random() * 10000);
+  setTimeout(showNextTicker, delay);
 }
 
 $("#btn-recharge").onclick = () => {
