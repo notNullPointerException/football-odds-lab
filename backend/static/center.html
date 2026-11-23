@@ -192,7 +192,10 @@ function showNextTicker() {
     if (i < fullText.length) {
       inner.textContent += fullText[i];
       i++;
-      setTimeout(type, 80);
+      setTimeout(type, 100);
+    } else {
+      // 打完后停留 3 秒再清空
+      setTimeout(() => { inner.textContent = ""; }, 3000);
     }
   };
   type();
