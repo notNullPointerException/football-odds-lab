@@ -166,8 +166,14 @@ async function loadTicker() {
       $("#ticker-inner").textContent = "暂无充值动态";
       return;
     }
-    // 打乱顺序
-    tickerData.sort(() => Math.random() - 0.5);
+    // 周卡优先，其次月卡，最后年卡；同类型内打乱
+    const order = {week: 0, month: 1, quarter: 2, year: 3};
+    tickerData.sort((a, b) => {
+      const oa = order[a.plan] ?? 9;
+      const ob = order[b.plan] ?? 9;
+      if (oa !== ob) return oa - ob;
+      return Math.random() - 0.5;
+    });
     tickerIndex = 0;
     $("#ticker-inner").textContent = "";
     setTimeout(showNextTicker, 5000);
