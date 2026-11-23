@@ -144,11 +144,11 @@ def is_member(user: User) -> bool:
     return bool(user.expires_at and user.expires_at > datetime.utcnow())
 
 
-def create_token(user_id: int, hours: int = 24) -> str:
+def create_token(user_id: int, hours: int = 0.5) -> str:  # 默认 30 分钟
     token = secrets.token_urlsafe(32)
     r = get_redis()
     if r:
-        r.setex(_token_key(token), hours * 3600, str(user_id))
+        r.setex(_token_key(token), int(hours * 3600), str(user_id))
     else:
         # fallback
         if not hasattr(create_token, "_mem"):

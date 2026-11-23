@@ -289,6 +289,42 @@
 })();
 </script>
 
+
+<script>
+// 会话失效检查：页面加载时 + 接口 401 时跳转登录页
+(function(){
+  const LOGIN = "/login.html";
+  async function checkSession() {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
+    try {
+      const r = await fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } });
+      if (r.status === 401 || r.status === 403) {
+        localStorage.removeItem("token");
+        if (location.pathname !== LOGIN) location.href = LOGIN;
+        return false;
+      }
+      return r.ok;
+    } catch(e) { return false; }
+  }
+  // 页面加载时检查
+  if (location.pathname !== LOGIN) {
+    checkSession();
+  }
+  // 拦截 fetch，401 时跳转
+  const origFetch = window.fetch;
+  window.fetch = async function(...args) {
+    const res = await origFetch.apply(this, args);
+    if (res.status === 401 && location.pathname !== LOGIN) {
+      localStorage.removeItem("token");
+      location.href = LOGIN;
+    }
+    return res;
+  };
+  window.checkSession = checkSession;
+})();
+</script>
+
 </head>
 <body>
 
