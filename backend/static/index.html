@@ -2922,5 +2922,33 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
 })();
 </script>
 
+
+<script>
+(function(){
+  var icon = document.getElementById("btn-user-icon");
+  var dd = document.getElementById("user-dropdown");
+  if(icon && dd){
+    icon.onclick = function(e){
+      e.stopPropagation();
+      dd.style.display = dd.style.display === "block" ? "none" : "block";
+      // always show logout if token exists
+      var token = localStorage.getItem("token");
+      var logout = document.getElementById("dd-logout");
+      if(logout) logout.style.display = token ? "block" : "none";
+    };
+  }
+  document.addEventListener("click", function(){
+    if(dd) dd.style.display = "none";
+  });
+  var logout = document.getElementById("dd-logout");
+  if(logout){
+    logout.onclick = function(){
+      localStorage.removeItem("token");
+      location.href = "/login.html";
+    };
+  }
+})();
+</script>
+
 </body>
 </html>
