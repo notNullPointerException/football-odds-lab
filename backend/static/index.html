@@ -450,6 +450,8 @@
     </div>
     <p class="hint" style="margin-top:10px">
       开通规则：非会员从今天起算；未到期的会员从现有到期日往后顺延，不吞剩余天数。
+      密码用 bcrypt 单向存储，任何人都看不到原文；用户忘记密码时用「重置密码」设一个新的（会踢掉对方已登录的会话）。
+      管理员账号只读：禁用 / 启用、重置密码、开通会员都不能作用于它（后端硬校验）。
     </p>
   </section>
 </main>
@@ -2288,7 +2290,8 @@ window.loadAdminUsers = async function loadAdminUsers() {
         : `<span style="color:var(--dim2)">非会员</span>`;
       const action = u.role === "admin"
         ? `<span class="hint">–</span>`
-        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button>`;
+        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button> ` +
+          `<button class="ghost" data-reset="${u.id}" data-name="${esc(u.username)}">重置密码</button>`;
       return `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.role)}</td>` +
         `<td>${u.is_active ? "正常" : `<span style="color:var(--bad)">已禁用</span>`}</td>` +
         `<td>${member}</td><td>${exp}</td><td>${action}</td></tr>`;
@@ -2325,6 +2328,25 @@ document.getElementById("adm-users")?.addEventListener("click", async ev => {
     window.loadAdminUsers();
   } catch (e) {
     alert("操作失败：" + (e.detail || e.message));
+  }
+});
+document.getElementById("adm-users")?.addEventListener("click", async ev => {
+  const b = ev.target.closest("button[data-reset]");
+  if (!b) return;
+  const name = b.dataset.name;
+  const input = prompt(`给「${name}」设置新密码（留空 = 自动生成 10 位随机密码）：`, "");
+  if (input === null) return;                 // 取消
+  try {
+    const res = await api(`/api/auth/admin/users/${b.dataset.reset}/reset-password`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ password: input.trim() }),
+    });
+    // 新密码只在这一次响应里，库里只有 bcrypt → 用 prompt 展示方便复制
+    prompt(`已重置「${name}」的密码（只显示这一次，复制后发给对方）：`, res.body.password);
+    window.loadAdminUsers();
+  } catch (e) {
+    alert("重置失败：" + (e.detail || e.message));
   }
 });
 window.refreshAdminEntry();

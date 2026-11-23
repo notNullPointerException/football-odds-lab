@@ -172,6 +172,25 @@ def get_user_id_from_token(token: str) -> Optional[int]:
     return None
 
 
+def revoke_user_tokens(user_id: int):
+    """让某用户的所有已登录会话立即失效（Redis 和进程内兜底都清）。
+
+    改密码/禁用账号后调用：旧 token 不能继续用新密码的账号。
+    """
+    r = get_redis()
+    if r:
+        try:
+            for key in r.scan_iter(match="token:*", count=500):
+                if r.get(key) == str(user_id):
+                    r.delete(key)
+        except Exception as e:
+            logger.warning(f"清除用户 {user_id} 的 token 失败: {e}")
+    mem = getattr(create_token, "_mem", None)
+    if mem:
+        for t in [t for t, v in mem.items() if v.get("user_id") == user_id]:
+            mem.pop(t, None)
+
+
 def get_current_user(
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
@@ -213,6 +232,16 @@ def require_admin(user: Optional[User] = Depends(get_current_user)) -> User:
     if user.role != "admin":
         raise HTTPException(403, "需要管理员权限")
     return user
+
+
+def _ensure_not_admin(user: User, action: str):
+    """统一护栏：管理员账号是只读的，任何后台操作都不能修改它。
+
+    禁用 / 启用 / 重置密码 / 开通会员 全部走这里 —— 防止误操作，
+    也防止 token 被偷后把管理员锁死。角色和用户名双重判断。
+    """
+    if user.role == "admin" or user.username == "admin":
+        raise HTTPException(400, f"管理员账号不允许{action}")
 
 
 
@@ -361,6 +390,7 @@ def activate_user(
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(404, "用户不存在")
+    _ensure_not_admin(user, "开通会员")
     user.is_active = True
     if plan:
         p = PLANS.get(plan)
@@ -391,11 +421,47 @@ def admin_toggle_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(404, "用户不存在")
-    if user.role == "admin":
-        raise HTTPException(400, "不能禁用管理员账号")
+    _ensure_not_admin(user, "禁用或启用")
     user.is_active = not user.is_active
     db.commit()
+    if not user.is_active:
+        revoke_user_tokens(user.id)   # 禁用后立刻踢下线，不等 token 自然过期
     return {"id": user.id, "username": user.username, "is_active": user.is_active}
+
+
+class ResetPasswordIn(BaseModel):
+    # 留空 = 自动生成随机密码；明文只在本次响应里返回一次，不落库
+    password: str = Field(default="", max_length=64)
+
+
+@router.post("/admin/users/{user_id}/reset-password")
+def admin_reset_password(
+    user_id: int,
+    body: Optional[ResetPasswordIn] = None,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """管理员：重置用户密码。
+
+    bcrypt 不可逆 → 只能重置、不能查看原密码。新密码只在本次响应的
+    password 字段里出现一次（库里仍是 bcrypt），关掉页面就看不到了。
+    重置成功会踢掉该用户所有已登录会话。
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    _ensure_not_admin(user, "重置密码（请用服务器上的 tools/init_admin.py）")
+    pwd = (body.password or "").strip() if body else ""
+    if pwd:
+        if is_weak_password(pwd):
+            raise HTTPException(400, "密码太简单，请包含字母和数字，且不少于6位")
+    else:
+        # 自动生成：去掉易混淆的 l/i/o/0/1，10 位够用且好口述
+        pwd = "".join(secrets.choice("abcdefghjkmnpqrstuvwxyz23456789") for _ in range(10))
+    user.password_hash = hash_password(pwd)
+    db.commit()
+    revoke_user_tokens(user.id)
+    return {"id": user.id, "username": user.username, "password": pwd}
 
 
 @router.get("/check-username")
