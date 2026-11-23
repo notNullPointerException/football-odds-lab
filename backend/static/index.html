@@ -348,7 +348,7 @@
       <div id="dd-login" style="padding:8px 14px;cursor:pointer;">登录</div>
       <div id="dd-register" style="padding:8px 14px;cursor:pointer;">注册</div>
       <div id="dd-center" style="padding:8px 14px;cursor:pointer;display:none;">个人中心</div>
-      <div id="dd-logout" style="padding:8px 14px;cursor:pointer;display:none;color:var(--bad);">退出登录</div>
+      <div id="dd-logout" style="padding:8px 14px;cursor:pointer;color:var(--bad);">退出登录</div>
     </div>
   </div>
 </header>
@@ -2702,7 +2702,7 @@ async function refreshUserIcon() {
   const token = localStorage.getItem("token");
   try { if (window.checkAuth) me = await window.checkAuth(); } catch(e) {}
   if (me || token) {
-    userIcon.textContent = "⚽️ " + me.username;
+    userIcon.textContent = "⚽️" + (me ? " " + me.username : "");
     document.getElementById("dd-login").style.display = "none";
     document.getElementById("dd-register").style.display = "none";
     document.getElementById("dd-center").style.display = "block";
