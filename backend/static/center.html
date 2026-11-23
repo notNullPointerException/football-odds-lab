@@ -118,10 +118,13 @@ async function loadUser() {
     $("#uc-username").textContent = me.username || "-";
     $("#uc-role").textContent = me.role || "-";
     const expEl = $("#uc-expires");
-    if (me.role === "admin" || !me.expires_at) {
+    if (me.role === "admin") {
       expEl.textContent = "无限制";
       expEl.style.color = "#f87171";
-      if (me.role === "admin") document.querySelector(".card:last-of-type").style.display = "none";
+      document.querySelector(".card:last-of-type").style.display = "none";
+    } else if (!me.expires_at) {
+      expEl.textContent = "未开通";
+      expEl.style.color = "#8b93a5";
     } else {
       // 倒计时
       const exp = new Date(me.expires_at);
@@ -160,7 +163,8 @@ async function loadTicker() {
     // 打乱顺序
     tickerData.sort(() => Math.random() - 0.5);
     tickerIndex = 0;
-    showNextTicker();
+    $("#ticker-inner").textContent = "";
+    setTimeout(showNextTicker, 5000);
   } catch(e) {
     $("#ticker-inner").textContent = "加载失败";
   }
