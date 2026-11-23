@@ -1,3 +1,5 @@
+from urllib.parse import quote_plus
+
 from pydantic_settings import BaseSettings
 
 
@@ -8,6 +10,10 @@ class Settings(BaseSettings):
     db_user: str = "root"
     db_password: str = ""
     db_name: str = "football"
+    # DB_HOST=localhost 时走 Unix socket。MySQL 的 host 匹配无法区分
+    # 本机 socket 和 127.0.0.1 TCP，只有 socket 才能在 skip_name_resolve
+    # 打开后把管理账号和对外只读账号隔离开。
+    db_unix_socket: str = "/tmp/mysql.sock"
 
     # API-Football
     api_football_key: str = ""
@@ -29,8 +35,15 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
+        user = quote_plus(self.db_user)
+        password = quote_plus(self.db_password)
+        if self.db_host == "localhost" and self.db_unix_socket:
+            return (
+                f"mysql+pymysql://{user}:{password}@/{self.db_name}"
+                f"?unix_socket={quote_plus(self.db_unix_socket)}"
+            )
         return (
-            f"mysql+pymysql://{self.db_user}:{self.db_password}"
+            f"mysql+pymysql://{user}:{password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 

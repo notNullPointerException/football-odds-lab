@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>登录 · AI Football</title>
+<link rel="preload" as="image" href="/login-bg.webp">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -17,7 +18,7 @@ body {
 }
 .bg {
   position: fixed; inset: 0;
-  background: url("/login-bg.jpg") center/cover no-repeat;
+  background: url("/login-bg.webp") center/cover no-repeat;
   filter: brightness(0.45);
   animation: kenburns 20s ease-in-out infinite alternate;
   z-index: 0;
@@ -89,7 +90,7 @@ input:focus { border-color: #4a9eff; }
 }
 .captcha-row input { flex: 1; margin-bottom: 0; }
 .captcha-row img {
-  height: 48px;
+  height: 60px;
   border-radius: 6px;
   cursor: pointer;
   background: #1e222b;

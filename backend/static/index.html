@@ -299,6 +299,7 @@
     <button data-tab="sfc">胜负14场</button>
     <button data-tab="predict">预测</button>
     <button data-tab="history">历史预测</button>
+    <button data-tab="admin" id="tab-admin-btn" hidden>管理</button>
     <button id="btn-user-center">个人中心</button>
   </nav>
   <span class="hint" id="net" style="margin-left:auto"></span>
@@ -383,6 +384,38 @@
     <div id="history-out"></div>
     <div class="pager" id="h-pager"></div>
   </section>
+
+  <!-- ============ 管理（仅 admin 可见） ============ -->
+  <section id="tab-admin" hidden>
+    <div class="bar">
+      <label for="adm-username">用户名</label>
+      <input id="adm-username" placeholder="输入用户名" autocomplete="off" list="adm-user-list">
+      <datalist id="adm-user-list"></datalist>
+      <label for="adm-plan">套餐</label>
+      <select id="adm-plan">
+        <option value="week">周卡 · 1周</option>
+        <option value="month">月卡 · 4周</option>
+        <option value="quarter">季卡 · 12周</option>
+        <option value="year">年卡 · 52周</option>
+      </select>
+      <button class="act" id="adm-open">开通 / 续费</button>
+      <button class="ghost" id="adm-refresh">刷新列表</button>
+      <span class="hint" id="adm-msg"></span>
+    </div>
+    <div class="card">
+      <div class="hd"><b style="font-size:13px">用户列表</b>
+        <span class="hint" id="adm-total"></span></div>
+      <div class="bd" style="padding:0;overflow:auto">
+        <table>
+          <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>状态</th><th>会员</th><th>到期时间</th><th>操作</th></tr></thead>
+          <tbody id="adm-users"><tr><td colspan="7" class="hint">加载中 …</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:10px">
+      开通规则：非会员从今天起算；未到期的会员从现有到期日往后顺延，不吞剩余天数。
+    </p>
+  </section>
 </main>
 
 <script>
@@ -438,11 +471,20 @@ const mark = v => v === 1 ? '<span style="color:var(--ok)">✓</span>'
               : '<span style="color:var(--dim2)">–</span>';
 
 /* ---------------- 请求封装 ---------------- */
+/* 所有带登录态的请求都自动带上 token —— 预测类接口后端要验会员。 */
+function withAuth(opts = {}) {
+  const tok = localStorage.getItem("token") || "";
+  if (!tok) return opts;
+  const headers = Object.assign({}, opts.headers || {});
+  if (!headers.Authorization) headers.Authorization = "Bearer " + tok;
+  return Object.assign({}, opts, { headers });
+}
+
 async function api(path, opts) {
   const t0 = performance.now();
   let res;
   try {
-    res = await fetch(path, opts);
+    res = await fetch(path, withAuth(opts));
   } catch (e) {
     throw new Error(`网络错误：${e.message}`);
   }
@@ -669,9 +711,11 @@ function switchTab(name) {
   $("#tab-sfc").hidden     = name !== "sfc";
   $("#tab-predict").hidden = name !== "predict";
   $("#tab-history").hidden = name !== "history";
+  $("#tab-admin").hidden   = name !== "admin";
   if (name === "jc" && !jc.loaded) loadJc(false);
   if (name === "sfc" && !sfc.loaded) loadSfc(false);
   if (name === "history" && !state.loaded) loadHistory(1);
+  if (name === "admin" && window.loadAdminUsers) window.loadAdminUsers();
 }
 $$("nav button").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
 
@@ -1567,6 +1611,8 @@ async function runOneSfcPredict(fid) {
 /* 格子上的「重跑」：只补这一场。整批正在跑时不插队（那是 sfc.running 的活）。 */
 async function rerunOneSfc(fid) {
   if (!fid || sfc.running) return;
+  const me = await window.ensureMember();
+  if (!me) return;
   sfc.st[fid] = "loading";
   patchSfcPred(fid);
   const okOne = await runOneSfcPredict(fid);
@@ -1672,6 +1718,8 @@ let predicting = false;   // 在途锁：按钮 disabled 挡不住回车键
 
 async function runPredict() {
   if (predicting) return;   // 一次预测 = 一次 LLM 调用(花钱) + 一次写库，不能重入
+  const me = await window.ensureMember();
+  if (!me) return;          // 未登录 → 登录框；未开会员 → 支付框
   const fid = parseInt($("#fid").value, 10);
   const out = $("#predict-out");
   if (!fid) { out.innerHTML = `<div class="err">请先填写 fixture_id</div>`; return; }
@@ -1791,7 +1839,14 @@ async function loadHistory(page) {
     renderPager(pages);
   } catch (e) {
     if (seq !== historySeq) return;
-    out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
+    // 预测记录是会员内容：401=没登录、403=没开会员，给引导而不是红字报错
+    if (e.status === 401) {
+      out.innerHTML = `<div class="empty">登录后可查看预测记录</div>`;
+    } else if (e.status === 403) {
+      out.innerHTML = `<div class="empty">开通会员后可查看预测记录</div>`;
+    } else {
+      out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
+    }
     $("#h-total").textContent = "";   // 清掉上次的条数，否则报错时顶栏还写着「共 137 条」
     $("#h-pager").innerHTML = "";
   } finally {
@@ -2120,7 +2175,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
     <input id="login-pass" type="password" placeholder="密码" style="width:100%;margin-bottom:8px">
     <div id="captcha-box" style="display:none;margin-bottom:8px;display:flex;gap:8px;align-items:center;">
       <input id="captcha-code" placeholder="验证码" style="flex:1">
-      <img id="captcha-img" style="height:48px;border-radius:4px;cursor:pointer" title="点击刷新">
+      <img id="captcha-img" style="height:60px;border-radius:4px;cursor:pointer" title="点击刷新">
     </div>
     <div id="reg-plans" style="display:none;margin-bottom:12px;">
       <label style="font-size:12px;color:var(--dim)">选择套餐</label>
@@ -2158,6 +2213,85 @@ function requireLogin() {
   document.getElementById("login-modal").style.display = "flex";
   return false;
 }
+function showPayModal() {
+  document.getElementById("pay-modal").style.display = "flex";
+}
+/* 预测类功能的统一门槛：没登录 → 登录框；登录了但没会员 → 支付框。
+   返回 me 表示放行，返回 null 表示已弹窗拦截。 */
+window.ensureMember = async function ensureMember() {
+  const me = await checkAuth();
+  if (!me) { requireLogin(); return null; }
+  if (!me.is_member) { showPayModal(); return null; }
+  return me;
+};
+
+/* ---------------- 管理页（仅 admin 可见，后端也强制 require_admin） ---------------- */
+window.refreshAdminEntry = async function refreshAdminEntry() {
+  let me = null;
+  try { me = await window.checkAuth(); } catch (e) {}
+  const btn = document.getElementById("tab-admin-btn");
+  if (btn) btn.hidden = !(me && me.role === "admin");
+  return me;
+};
+
+window.loadAdminUsers = async function loadAdminUsers() {
+  const tb = document.getElementById("adm-users");
+  if (!tb) return;
+  tb.innerHTML = `<tr><td colspan="7" class="hint">加载中 …</td></tr>`;
+  try {
+    const res = await api("/api/auth/admin/users");
+    const users = res.body || [];
+    const dl = document.getElementById("adm-user-list");
+    if (dl) dl.innerHTML = users.map(u => `<option value="${esc(u.username)}"></option>`).join("");
+    const total = document.getElementById("adm-total");
+    if (total) total.textContent = `共 ${users.length} 个账号`;
+    tb.innerHTML = users.map(u => {
+      const exp = u.expires_at ? esc(String(u.expires_at).replace("T", " ").slice(0, 16)) : "–";
+      const member = u.is_member
+        ? `<span style="color:var(--ok)">会员</span>`
+        : `<span style="color:var(--dim2)">非会员</span>`;
+      const action = u.role === "admin"
+        ? `<span class="hint">–</span>`
+        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button>`;
+      return `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.role)}</td>` +
+        `<td>${u.is_active ? "正常" : `<span style="color:var(--bad)">已禁用</span>`}</td>` +
+        `<td>${member}</td><td>${exp}</td><td>${action}</td></tr>`;
+    }).join("") || `<tr><td colspan="7" class="hint">还没有用户</td></tr>`;
+  } catch (e) {
+    tb.innerHTML = `<tr><td colspan="7" style="color:var(--bad)">${esc(e.message)}</td></tr>`;
+  }
+};
+
+document.getElementById("adm-open")?.addEventListener("click", async () => {
+  const name = document.getElementById("adm-username").value.trim();
+  const plan = document.getElementById("adm-plan").value;
+  const msg = document.getElementById("adm-msg");
+  if (!name) { msg.textContent = "请先输入用户名"; return; }
+  msg.textContent = "处理中 …";
+  try {
+    const res = await api(`/api/auth/activate?username=${encodeURIComponent(name)}&plan=${plan}`, { method: "POST" });
+    msg.textContent = (res.body && res.body.msg) || "已开通";
+    window.loadAdminUsers();
+  } catch (e) {
+    msg.textContent = "开通失败：" + (e.detail || e.message);
+  }
+});
+document.getElementById("adm-username")?.addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("adm-open")?.click();
+});
+document.getElementById("adm-refresh")?.addEventListener("click", () => window.loadAdminUsers());
+document.getElementById("adm-users")?.addEventListener("click", async ev => {
+  const b = ev.target.closest("button[data-toggle]");
+  if (!b) return;
+  if (!confirm(`确认${b.textContent}用户「${b.dataset.name}」？`)) return;
+  try {
+    await api(`/api/auth/admin/users/${b.dataset.toggle}/toggle`, { method: "POST" });
+    window.loadAdminUsers();
+  } catch (e) {
+    alert("操作失败：" + (e.detail || e.message));
+  }
+});
+window.refreshAdminEntry();
 document.getElementById("btn-close-pay")?.addEventListener("click", () => {
   document.getElementById("pay-modal").style.display = "none";
 });
@@ -2176,6 +2310,7 @@ document.getElementById("btn-login").onclick = async () => {
     _token = d.token; localStorage.setItem("token", _token);
     document.getElementById("login-modal").style.display = "none";
     alert("登录成功");
+    if (window.refreshAdminEntry) window.refreshAdminEntry();
   } else {
     document.getElementById("login-msg").textContent = d.detail || "登录失败";
   }
@@ -2195,9 +2330,7 @@ document.getElementById("btn-register").onclick = async () => {
   if (r.ok) {
     _token = d.token; localStorage.setItem("token", _token);
     document.getElementById("login-modal").style.display = "none";
-    document.getElementById("login-modal").style.display = "none";
-    document.getElementById("pay-modal").style.display = "flex";
-    alert("注册成功，请扫码支付后联系管理员激活");
+    alert("注册成功，已登录（浏览免费；预测功能需开通会员）");
   } else {
     document.getElementById("login-msg").textContent = d.detail || "注册失败";
   }
@@ -2208,8 +2341,8 @@ const _origSfcRun = document.getElementById("sfc-run")?.onclick;
 const _origSfcArchive = document.getElementById("sfc-archive")?.onclick;
 if (document.getElementById("sfc-run")) {
   document.getElementById("sfc-run").onclick = async function() {
-    const me = await checkAuth();
-    if (!me) { requireLogin(); return; }
+    const me = await ensureMember();
+    if (!me) return;
     if (_origSfcRun) return _origSfcRun.call(this);
   };
 }
@@ -2443,7 +2576,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
     <input id="reg-pass2" type="password" placeholder="确认密码" maxlength="12" style="width:100%;margin-bottom:8px;padding:8px">
     <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
       <input id="reg-captcha" placeholder="验证码" style="flex:1;padding:8px">
-      <img id="reg-captcha-img" style="height:48px;border-radius:4px;cursor:pointer" title="点击刷新">
+      <img id="reg-captcha-img" style="height:60px;border-radius:4px;cursor:pointer" title="点击刷新">
     </div>
     <button class="act" id="btn-do-register" style="width:100%;margin-bottom:12px">注册</button>
     <p style="text-align:center;font-size:13px;color:var(--dim)">
@@ -2557,7 +2690,8 @@ async function refreshUserIcon() {
 refreshUserIcon();
 
 document.getElementById("dd-login")?.addEventListener("click", () => {
-  document.getElementById("login-page").style.display = "flex";
+  // 用登录弹窗（唯一有绑定登录逻辑的那套）；login-page 的按钮没有 handler，别用
+  document.getElementById("login-modal").style.display = "flex";
   dropdown.style.display = "none";
 });
 document.getElementById("dd-register")?.addEventListener("click", () => {

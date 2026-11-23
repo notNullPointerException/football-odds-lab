@@ -8,6 +8,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.api.auth import require_member
+from app.core.rate_limit import hit
 from app.services.context_service import EMPTY_CTX, context_for_fixtures
 # 从 prediction.errors 拿：这个模块只有 stdlib，import 它不会把 pandas/xgboost 拖起来
 # （predict.predict 才是重的，那个仍然留在 _run() 里惰性导入）。
@@ -45,13 +47,16 @@ def _jc_block(d: dict) -> dict | None:
 
 
 @router.post("/predict/{fixture_id}")
-async def predict_match(fixture_id: int):
-    """手动触发单场预测。
+async def predict_match(fixture_id: int, _member=Depends(require_member)):
+    """手动触发单场预测（需登录 + 会员）。
 
     失败分两种，页面上长得不一样，别混：
       502 + 具体原因 = 该场预测【跑了但没跑成】（LLM 超时 / 联赛没模型 / 特征不足）→ 可重跑
       400 "无需预测"  = 【压根不该跑】（查无此场 / 命中黑名单）→ 重跑也没用
     """
+    # 每场预测都要真金白银调 LLM：按用户限速，防脚本刷爆账单
+    if not hit(f"predict:u:{_member.id}", 120, 3600):
+        raise HTTPException(status_code=429, detail="预测请求过于频繁，请稍后再试")
     def _run():
         from prediction.predict import predict_fixture
         return predict_fixture(fixture_id)
@@ -73,6 +78,7 @@ async def get_predictions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    _member=Depends(require_member),
 ):
     return await asyncio.to_thread(
         _get_predictions_sync, db, date, category, page, page_size

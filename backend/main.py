@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -67,14 +66,30 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ⚠️ 不再开后门 CORS：前端与 API 同源（同一个 8000 端口），不需要跨域。
+# 原来的 allow_origins=["*"] + allow_credentials=True 等于允许任意网站带凭据调本 API。
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """基础安全响应头（防 MIME 嗅探 / 点击劫持 / 外链脚本注入）。"""
+    response = await call_next(request)
+    h = response.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "no-referrer")
+    h.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    # 页面全部脚本/样式内联，所以 'unsafe-inline' 必须留；但外域脚本一律禁止。
+    h.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "img-src 'self' data: blob: https:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'self'",
+    )
+    return response
 
 # 注册路由
 app.include_router(leagues_router, prefix="/api", tags=["Leagues"])

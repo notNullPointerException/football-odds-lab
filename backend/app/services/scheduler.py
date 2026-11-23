@@ -16,6 +16,7 @@ from app.services.bet_journal_service import weekly_review_job
 from app.services.odds_watch_service import odds_watch_job
 from app.services.sfc_archive_service import sfc_archive_job
 from app.services.sfc_history_service import sfc_result_sync_job
+from app.services.sfc_predict_service import sfc_predict_job
 
 LIVE_INTERVAL_SECONDS = 2 * 60
 
@@ -77,6 +78,19 @@ _DEFAULT_TASKS = {
     "sfc_archive":      {"name": "胜负彩存档(午间)", "start_hour": 13.25, "fn": sfc_archive_job,
                          "interval_seconds": None},
     "sfc_archive_eve":  {"name": "胜负彩存档(晚间)", "start_hour": 21.25, "fn": sfc_archive_job,
+                         "interval_seconds": None},
+    # ── 胜负彩赛前预测 —— 2026-11-11 加 ──────────────────────────────
+    # 存档只做快照，不会触发预测；auto_predict 自 2026-06-11 起 is_enabled=0，
+    # 且只看 enabled 联赛 + 24h 窗口，覆盖不到胜负彩（欧国联 enabled=0、场次在 2~3 天后）。
+    # 这两条 job 才负责把当前期 14 场送进 /api/predict，再强制存档。
+    #
+    # 为什么又是两条：与 odds_watch / sfc_archive 同理，`_run_loop` 每轮只算一个
+    # start_hour，一个 id 一天只能跑一次。11:45 覆盖 19:05/20:30 早停售的期，
+    # 19:45 覆盖 21:00/22:00 晚停售的期；13:15/21:15 的存档随后再兜一次。
+    # 两次都只预测「未开球且还没有 pred+llm」的场次，不会重复烧 LLM。
+    "sfc_predict":      {"name": "胜负彩赛前预测(午间)", "start_hour": 11.75, "fn": sfc_predict_job,
+                         "interval_seconds": None},
+    "sfc_predict_eve":  {"name": "胜负彩赛前预测(晚间)", "start_hour": 19.75, "fn": sfc_predict_job,
                          "interval_seconds": None},
 }
 

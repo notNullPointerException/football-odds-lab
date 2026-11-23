@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from loguru import logger
 
 from app.db.session import get_db
+from app.api.auth import require_admin
 from app.services.scheduler import (
     get_scheduler_status, stop_scheduled_task, start_scheduled_task,
     update_task, run_task_with_log,
@@ -18,6 +19,7 @@ from app.services.auto_predict_service import auto_predict
 from app.services.odds_watch_service import odds_watch_job
 from app.services.sfc_archive_service import sfc_archive_job
 from app.services.sfc_history_service import sfc_result_sync_job
+from app.services.sfc_predict_service import sfc_predict_job
 
 router = APIRouter()
 
@@ -38,16 +40,18 @@ TASK_MAP = {
     "sfc_result_sync": ("胜负彩赛果同步", sfc_result_sync_job),
     "sfc_archive":     ("胜负彩存档(午间)", sfc_archive_job),
     "sfc_archive_eve": ("胜负彩存档(晚间)", sfc_archive_job),
+    "sfc_predict":     ("胜负彩赛前预测(午间)", sfc_predict_job),
+    "sfc_predict_eve": ("胜负彩赛前预测(晚间)", sfc_predict_job),
 }
 
 
 @router.get("/scheduler/status")
-async def scheduler_status():
+async def scheduler_status(_admin=Depends(require_admin)):
     return await asyncio.to_thread(get_scheduler_status)
 
 
 @router.post("/scheduler/{task_id}/trigger")
-async def trigger_task(task_id: str):
+async def trigger_task(task_id: str, _admin=Depends(require_admin)):
     if task_id not in TASK_MAP:
         raise HTTPException(status_code=404, detail="任务不存在")
     name, fn = TASK_MAP[task_id]
@@ -58,44 +62,44 @@ async def trigger_task(task_id: str):
 
 # ═══ 兼容旧接口 ═══
 @router.post("/scheduler/leagues/sync")
-async def trigger_league_sync(db: Session = Depends(get_db)):
+async def trigger_league_sync(db: Session = Depends(get_db), _admin=Depends(require_admin)):
     logger.info("手动触发: 联赛数据同步")
     sync_leagues(db)
     return {"status": "ok"}
 
 @router.post("/scheduler/teams/sync")
-async def trigger_team_sync(db: Session = Depends(get_db)):
+async def trigger_team_sync(db: Session = Depends(get_db), _admin=Depends(require_admin)):
     logger.info("手动触发: 球队数据同步")
     sync_teams(db)
     return {"status": "ok"}
 
 @router.post("/scheduler/players/sync")
-async def trigger_player_sync(db: Session = Depends(get_db)):
+async def trigger_player_sync(db: Session = Depends(get_db), _admin=Depends(require_admin)):
     logger.info("手动触发: 球员数据同步")
     sync_players(db)
     return {"status": "ok"}
 
 @router.post("/scheduler/standings/sync")
-async def trigger_standing_sync(db: Session = Depends(get_db)):
+async def trigger_standing_sync(db: Session = Depends(get_db), _admin=Depends(require_admin)):
     logger.info("手动触发: 积分榜数据同步")
     sync_standings(db)
     return {"status": "ok"}
 
 @router.post("/scheduler/fixtures/sync")
-async def trigger_fixture_sync(db: Session = Depends(get_db)):
+async def trigger_fixture_sync(db: Session = Depends(get_db), _admin=Depends(require_admin)):
     logger.info("手动触发: 赛程每日同步")
     sync_fixtures(db)
     return {"status": "ok"}
 
 @router.post("/scheduler/fixtures/live")
-async def trigger_live_sync(db: Session = Depends(get_db)):
+async def trigger_live_sync(db: Session = Depends(get_db), _admin=Depends(require_admin)):
     logger.info("手动触发: 赛程实时同步")
     sync_live_fixtures(db)
     return {"status": "ok"}
 
 
 @router.post("/scheduler/{task_id}/stop")
-async def stop_task(task_id: str):
+async def stop_task(task_id: str, _admin=Depends(require_admin)):
     ok = stop_scheduled_task(task_id)
     if not ok:
         raise HTTPException(status_code=404, detail="任务不存在或无需停止")
@@ -103,7 +107,7 @@ async def stop_task(task_id: str):
 
 
 @router.post("/scheduler/{task_id}/start")
-async def start_task(task_id: str):
+async def start_task(task_id: str, _admin=Depends(require_admin)):
     ok = start_scheduled_task(task_id)
     if not ok:
         raise HTTPException(status_code=400, detail="任务不存在或已在运行")
@@ -112,7 +116,8 @@ async def start_task(task_id: str):
 
 @router.patch("/scheduler/{task_id}")
 async def patch_task(task_id: str, start_hour: float | None = None,
-                     interval_seconds: int | None = None, is_enabled: bool | None = None):
+                     interval_seconds: int | None = None, is_enabled: bool | None = None,
+                     _admin=Depends(require_admin)):
     ok = update_task(task_id, start_hour=start_hour, interval_seconds=interval_seconds,
                      is_enabled=is_enabled)
     if not ok:
@@ -121,7 +126,7 @@ async def patch_task(task_id: str, start_hour: float | None = None,
 
 
 @router.get("/scheduler/logs")
-async def get_logs(page: int = 1, page_size: int = 20, task_id: str | None = None):
+async def get_logs(page: int = 1, page_size: int = 20, task_id: str | None = None, _admin=Depends(require_admin)):
     return await asyncio.to_thread(_get_logs_sync, page, page_size, task_id)
 
 
