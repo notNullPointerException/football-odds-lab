@@ -2288,7 +2288,8 @@ window.loadAdminUsers = async function loadAdminUsers() {
         : `<span style="color:var(--dim2)">非会员</span>`;
       const action = u.role === "admin"
         ? `<span class="hint">–</span>`
-        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button>`;
+        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button>
+           <button class="ghost" data-reset="${u.id}" data-name="${esc(u.username)}">重置密码</button>`;
       return `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.role)}</td>` +
         `<td>${u.is_active ? "正常" : `<span style="color:var(--bad)">已禁用</span>`}</td>` +
         `<td>${member}</td><td>${exp}</td><td>${action}</td></tr>`;
@@ -2316,6 +2317,25 @@ document.getElementById("adm-username")?.addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("adm-open")?.click();
 });
 document.getElementById("adm-refresh")?.addEventListener("click", () => window.loadAdminUsers());
+
+document.getElementById("adm-users")?.addEventListener("click", async ev => {
+  const b = ev.target.closest("button[data-reset]");
+  if (!b) return;
+  const newPass = await styledPrompt(`给「${b.dataset.name}」设置新密码`, "留空则自动生成");
+  if (newPass === null) return;
+  try {
+    const res = await api(`/api/auth/admin/users/${b.dataset.reset}/reset-password`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ password: newPass || "" })
+    });
+    alert("已重置，新密码：" + (res.body?.password || newPass || "已生成"));
+    window.loadAdminUsers();
+  } catch (e) {
+    alert("重置失败：" + (e.detail || e.message));
+  }
+});
+
 document.getElementById("adm-users")?.addEventListener("click", async ev => {
   const b = ev.target.closest("button[data-toggle]");
   if (!b) return;
