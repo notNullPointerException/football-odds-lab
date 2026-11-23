@@ -255,10 +255,8 @@ $("#btn-register").onclick = async () => {
   });
   const d = await r.json();
   if (r.ok) {
-    $("#tab-login").click();
     $("#login-user").value = u;
-    $("#login-msg").textContent = "注册成功，请登录";
-    $("#login-msg").style.color = "#4ade80";
+    document.getElementById("success-modal").style.display = "flex";
   } else {
     msg.textContent = d.detail || "注册失败";
     document.getElementById("reg-captcha").value = "";
@@ -308,6 +306,15 @@ document.addEventListener("keydown", e => {
   }
 })();
 </script>
+
+
+<div id="success-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#1e222b;border-radius:12px;padding:32px;text-align:center;min-width:280px;">
+    <div style="font-size:48px;margin-bottom:12px;">✓</div>
+    <p style="font-size:16px;margin-bottom:20px;color:#4ade80;">注册成功，请登录</p>
+    <button class="btn" onclick="document.getElementById('success-modal').style.display='none';document.getElementById('tab-login').click();" style="width:auto;padding:10px 32px;">确定</button>
+  </div>
+</div>
 
 </body>
 </html>
