@@ -77,8 +77,7 @@ select {
   display: inline-block;
 }
 .ticker-inner {
-  text-align: right;
-  direction: rtl;
+  white-space: nowrap;
 }
 
 
@@ -196,21 +195,19 @@ function showNextTicker() {
   const inner = $("#ticker-inner");
   const fullText = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
   inner.textContent = "";
-  let i = fullText.length;
+  let i = 0;
   const type = () => {
-    if (i > 0) {
-      i--;
-      inner.textContent = fullText.slice(i);
-      setTimeout(type, 120);
+    if (i < fullText.length) {
+      inner.textContent = fullText.slice(0, i + 1);
+      i++;
+      setTimeout(type, 150);
     } else {
-      // 打完后停留 2 秒再清空
       setTimeout(() => { inner.textContent = ""; }, 2000);
     }
   };
   type();
   tickerIndex++;
-  // 等打完 + 停留后再出下一条
-  const totalTime = fullText.length * 120 + 2500;
+  const totalTime = fullText.length * 150 + 2500;
   setTimeout(() => {
     isScrolling = false;
     // 计算下一条的等待时间
