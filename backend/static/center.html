@@ -71,23 +71,28 @@ select {
 }
 .ticker-inner {
   white-space: nowrap;
-  transform: translateX(-100%);
-  animation: slideIn 1.5s ease-out forwards;
+  display: inline-block;
 }
-@keyframes slideIn {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
+.ticker-inner.scrolling {
+  animation: scrollAcross 8s linear forwards;
+}
+@keyframes scrollAcross {
+  0% { transform: translateX(-100%); }
+  10% { transform: translateX(0); }
+  90% { transform: translateX(0); }
+  100% { transform: translateX(100%); }
 }
 .back { color: #4a9eff; cursor: pointer; }
 </style>
 </head>
 <body>
 <div class="header">
-  <a href="/" class="back" style="font-size:18px;color:#4a9eff;font-weight:600;">← 返回</a>
-  <h1>个人中心</h1>
-  <a href="/" style="margin-left:auto;font-size:20px;color:#8b93a5;text-decoration:none;">✕</a>
+  <a href="/" class="back" style="font-size:20px;color:#4a9eff;font-weight:600;">← 返回</a>
+  <h1 style="font-size:20px;">个人中心</h1>
+  
 </div>
-<div class="container">
+<div class="container" style="position:relative;">
+  <a href="/" style="position:absolute;top:-8px;right:20px;font-size:22px;color:#8b93a5;text-decoration:none;z-index:10;">✕</a>
   <div class="ticker" id="ticker">
     <div class="ticker-inner" id="ticker-inner">加载中…</div>
   </div>
@@ -186,10 +191,10 @@ function showNextTicker() {
   const d = tickerData[tickerIndex % tickerData.length];
   const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
   const inner = $("#ticker-inner");
-  inner.style.animation = "none";
+  inner.classList.remove("scrolling");
   inner.textContent = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
   void inner.offsetWidth;
-  inner.style.animation = "slideIn 1.5s ease-out forwards";
+  inner.classList.add("scrolling");
   tickerIndex++;
   // 第一条 5 秒，前几条 10-60 秒，之后 2-3 分钟
   let delay;
