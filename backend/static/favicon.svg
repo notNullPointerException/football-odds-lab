@@ -1,5 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="48" fill="#1a1a2e"/>
-  <circle cx="50" cy="50" r="40" fill="none" stroke="#fff" stroke-width="3"/>
-  <polygon points="50,15 61,38 85,38 66,54 73,77 50,63 27,77 34,54 15,38 39,38" fill="#fff"/>
+  <circle cx="50" cy="50" r="48" fill="#f5f5f5"/>
+  <circle cx="50" cy="50" r="46" fill="none" stroke="#333" stroke-width="2"/>
+  <!-- pentagon -->
+  <polygon points="50,22 62,36 58,52 42,52 38,36" fill="#333"/>
+  <!-- surrounding patches -->
+  <polygon points="50,22 38,36 28,28 36,16" fill="#333"/>
+  <polygon points="50,22 62,36 72,28 64,16" fill="#333"/>
+  <polygon points="62,36 58,52 70,58 76,42" fill="#333"/>
+  <polygon points="38,36 42,52 30,58 24,42" fill="#333"/>
+  <polygon points="58,52 42,52 46,66 54,66" fill="#333"/>
+  <polygon points="30,58 42,52 46,66 34,72" fill="#333"/>
+  <polygon points="70,58 58,52 54,66 66,72" fill="#333"/>
+  <polygon points="46,66 54,66 50,78" fill="#333"/>
 </svg>
