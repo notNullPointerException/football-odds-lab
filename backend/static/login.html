@@ -255,9 +255,10 @@ $("#btn-register").onclick = async () => {
   });
   const d = await r.json();
   if (r.ok) {
-    alert("注册成功，请登录");
     $("#tab-login").click();
     $("#login-user").value = u;
+    $("#login-msg").textContent = "注册成功，请登录";
+    $("#login-msg").style.color = "#4ade80";
   } else {
     msg.textContent = d.detail || "注册失败";
     document.getElementById("reg-captcha").value = "";
