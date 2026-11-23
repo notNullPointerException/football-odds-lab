@@ -170,8 +170,11 @@ function showNextTicker() {
   const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
   $("#ticker-inner").textContent = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
   tickerIndex++;
-  // 第一条 5 秒后出现下一条，之后随机 10-20 秒
-  const delay = tickerIndex === 1 ? 5000 : (10000 + Math.random() * 10000);
+  // 第一条 5 秒，前几条 10-60 秒，之后 2-3 分钟
+  let delay;
+  if (tickerIndex === 1) delay = 5000;
+  else if (tickerIndex <= 3) delay = 10000 + Math.random() * 50000;
+  else delay = 120000 + Math.random() * 60000;
   setTimeout(showNextTicker, delay);
 }
 
