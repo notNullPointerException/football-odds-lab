@@ -345,6 +345,8 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     ip = client_ip(request)
     if not hit(f"login:ip:{ip}", 20, 300) or not hit(f"login:user:{body.username}", 10, 300):
         raise HTTPException(429, "尝试过于频繁，请稍后再试")
+    if not verify_captcha(body.captcha_id, body.captcha_code):
+        raise HTTPException(400, "验证码错误或已过期")
     user = db.query(User).filter(User.username == body.username).first()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "用户名或密码错误")

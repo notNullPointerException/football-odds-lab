@@ -138,6 +138,10 @@ input:focus { border-color: #4a9eff; }
   <div id="panel-login">
     <input id="login-user" placeholder="用户名" maxlength="8">
     <input id="login-pass" type="password" placeholder="密码" maxlength="12">
+    <div class="captcha-row">
+      <input id="login-captcha" placeholder="验证码">
+      <img id="login-captcha-img" title="点击刷新">
+    </div>
     <button class="btn" id="btn-login">登录</button>
     <p class="msg" id="login-msg"></p>
   </div>
@@ -187,22 +191,37 @@ async function loadCaptcha() {
 $("#reg-captcha-img").onclick = loadCaptcha;
 
 // login
+async function loadLoginCaptcha() {
+  const img = $("#login-captcha-img");
+  if (!img) return;
+  const r = await fetch("/api/auth/captcha");
+  const cid = r.headers.get("X-Captcha-Id");
+  const blob = await r.blob();
+  img.src = URL.createObjectURL(blob);
+  img.dataset.cid = cid;
+}
+$("#login-captcha-img")?.addEventListener("click", loadLoginCaptcha);
+loadLoginCaptcha();
+
 $("#btn-login").onclick = async () => {
   const u = $("#login-user").value.trim();
   const p = $("#login-pass").value;
+  const ccode = $("#login-captcha")?.value.trim() || "";
+  const cid = $("#login-captcha-img")?.dataset.cid || "";
   const msg = $("#login-msg");
   if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
+  if (!ccode) { msg.textContent = "请输入验证码"; return; }
   const r = await fetch("/api/auth/login", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username: u, password: p})
+    body: JSON.stringify({username: u, password: p, captcha_id: cid, captcha_code: ccode})
   });
   const d = await r.json();
   if (r.ok) {
     localStorage.setItem("token", d.token);
     location.href = "/";
   } else {
-    msg.textContent = d.detail || "登录失败";
+    msg.textContent = d.detail || "登录失败"; loadLoginCaptcha();
   }
 };
 
