@@ -126,6 +126,11 @@ input:focus { border-color: #4a9eff; }
 </style>
 </head>
 <body>
+
+<audio id="bgm" loop>
+  <source src="/media/MIRBRO - C R 7_EM.flac" type="audio/flac">
+</audio>
+
 <div class="bg"></div>
 <div class="card">
   <h1>AI Football</h1>
@@ -269,5 +274,36 @@ document.addEventListener("keydown", e => {
   }
 });
 </script>
+
+<script>
+(function(){
+  var bgm = document.getElementById("bgm");
+  if(bgm){
+    // 用户交互后播放（浏览器限制）
+    document.addEventListener("click", function start(){
+      bgm.play().catch(function(){});
+      document.removeEventListener("click", start);
+    }, {once:true});
+    // 也尝试自动播放
+    bgm.play().catch(function(){});
+  }
+  // 登录成功时停止
+  var origLogin = document.getElementById("btn-login");
+  if(origLogin){
+    var oldClick = origLogin.onclick;
+    origLogin.addEventListener("click", function(){
+      // 监听登录结果
+      var check = setInterval(function(){
+        if(localStorage.getItem("token")){
+          if(bgm) bgm.pause();
+          clearInterval(check);
+        }
+      }, 500);
+      setTimeout(function(){ clearInterval(check); }, 10000);
+    });
+  }
+})();
+</script>
+
 </body>
 </html>
