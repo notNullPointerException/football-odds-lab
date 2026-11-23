@@ -118,6 +118,9 @@ async function loadUser() {
     $("#uc-username").textContent = me.username || "-";
     $("#uc-role").textContent = me.role || "-";
     $("#uc-expires").textContent = me.expires_at ? String(me.expires_at).slice(0,10) : "未开通";
+    if (me.role === "admin") {
+      document.querySelector(".card:last-of-type").style.display = "none";
+    }
   } catch(e) {
     location.href = "/login.html";
   }
