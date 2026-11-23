@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>维护升级中</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e0e0e0;
+    }
+    .container { text-align: center; padding: 40px 20px; max-width: 480px; }
+    .emoji { font-size: 80px; margin-bottom: 24px; animation: bounce 2s infinite; }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    h1 { font-size: 28px; font-weight: 600; margin-bottom: 16px; color: #fff; }
+    p { font-size: 16px; line-height: 1.6; color: #a0a0a0; margin-bottom: 12px; }
+    .status {
+      display: inline-block;
+      background: rgba(255, 193, 7, 0.15);
+      color: #ffc107;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+    .footer { margin-top: 40px; font-size: 13px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="emoji">😢</div>
+    <h1>系统维护升级中</h1>
+    <p>服务暂时不可用，可能正在维护或遇到异常。</p>
+    <p>请稍后再试，感谢您的耐心等待。</p>
+    <div class="status">维护中 · 预计很快恢复</div>
+    <div class="footer">AI Football · 预测台</div>
+  </div>
+</body>
+</html>
