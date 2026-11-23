@@ -127,8 +127,9 @@ input:focus { border-color: #4a9eff; }
 </head>
 <body>
 
-<audio id="bgm" loop>
+<audio id="bgm" loop preload="auto" playsinline>
   <source src="/media/MIRBRO - C R 7_EM.flac" type="audio/flac">
+  <source src="/media/MIRBRO - C R 7_EM.mp3" type="audio/mpeg">
 </audio>
 
 <div class="bg"></div>
@@ -281,15 +282,25 @@ document.addEventListener("keydown", e => {
 (function(){
   var bgm = document.getElementById("bgm");
   if(bgm){
-    // 用户交互后播放（浏览器限制）
-    document.addEventListener("click", function start(){
+    function tryPlay(){
       bgm.play().catch(function(){});
+    }
+    document.addEventListener("click", function start(){
+      tryPlay();
       var hint = document.getElementById("sound-hint");
       if(hint) hint.style.display = "none";
       document.removeEventListener("click", start);
     }, {once:true});
-    // 也尝试自动播放
-    bgm.play().catch(function(){});
+    tryPlay();
+    // 页面切回来时恢复
+    document.addEventListener("visibilitychange", function(){
+      if(!document.hidden) tryPlay();
+    });
+    // 意外暂停时恢复
+    bgm.addEventListener("pause", function(){
+      if(!document.hidden) setTimeout(tryPlay, 100);
+    });
+    bgm.addEventListener("ended", tryPlay);
   }
   // 登录成功时停止
   var origLogin = document.getElementById("btn-login");
