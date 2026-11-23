@@ -94,6 +94,8 @@ PLANS = {
 class LoginIn(BaseModel):
     username: str = Field(max_length=64)
     password: str = Field(max_length=64)
+    captcha_id: str = Field(default="", max_length=64)
+    captcha_code: str = Field(default="", max_length=16)
 
 
 class UserOut(BaseModel):
@@ -300,7 +302,7 @@ def verify_captcha(cid: str, code: str) -> bool:
         return False
     r = get_redis()
     if not r:
-        return True  # Redis 不可用时放行
+        return False  # Redis 不可用时拒绝
     stored = r.get(_captcha_key(cid))
     if stored and stored == code.lower().strip():
         r.delete(_captcha_key(cid))
