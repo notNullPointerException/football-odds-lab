@@ -76,12 +76,9 @@ select {
   white-space: nowrap;
   display: inline-block;
 }
-.ticker-inner.scrolling {
-  animation: marquee 15s linear forwards;
-}
-@keyframes marquee {
-  0% { transform: translateX(110%); }
-  100% { transform: translateX(-110%); }
+.ticker-inner {
+  text-align: right;
+  direction: rtl;
 }
 
 
@@ -198,15 +195,23 @@ function showNextTicker() {
   const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
   const inner = $("#ticker-inner");
   const fullText = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
-  inner.textContent = fullText;
-  inner.classList.remove("scrolling");
-  void inner.offsetWidth;
-  inner.classList.add("scrolling");
+  inner.textContent = "";
+  let i = fullText.length;
+  const type = () => {
+    if (i > 0) {
+      i--;
+      inner.textContent = fullText.slice(i);
+      setTimeout(type, 120);
+    } else {
+      // 打完后停留 2 秒再清空
+      setTimeout(() => { inner.textContent = ""; }, 2000);
+    }
+  };
+  type();
   tickerIndex++;
-  // 12 秒滚动结束后清空，再等间隔才出下一条
+  // 等打完 + 停留后再出下一条
+  const totalTime = fullText.length * 120 + 2500;
   setTimeout(() => {
-    inner.textContent = "";
-    inner.classList.remove("scrolling");
     isScrolling = false;
     // 计算下一条的等待时间
     let delay;
