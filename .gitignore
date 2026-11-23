@@ -18,3 +18,5 @@ logs/
 backend/tools/jc_history_cache*.json
 # build_jc_map.py 的产物
 backend/tools/jc_map.json
+# 本地媒体文件（体积大，不进仓库）
+backend/media/

@@ -127,9 +127,10 @@ input:focus { border-color: #4a9eff; }
 </head>
 <body>
 
+<!-- MP3 放第一个：手机端只加载 3.8MB，避免 112MB FLAC 缓冲卡顿；FLAC 仅作兜底 -->
 <audio id="bgm" loop preload="auto" playsinline>
-  <source src="/media/MIRBRO - C R 7_EM.flac" type="audio/flac">
   <source src="/media/MIRBRO - C R 7_EM.mp3" type="audio/mpeg">
+  <source src="/media/MIRBRO - C R 7_EM.flac" type="audio/flac">
 </audio>
 
 <div class="bg"></div>

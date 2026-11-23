@@ -114,12 +114,11 @@ async def health():
 # 否则 mount("/") 会先匹配，把 /api/* 也当成静态文件去磁盘找。
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 if _STATIC_DIR.is_dir():
-    
-# 音乐等媒体文件
-_MEDIA_DIR = Path(__file__).resolve().parent / "media"
-if _MEDIA_DIR.exists():
-    app.mount("/media", StaticFiles(directory=str(_MEDIA_DIR)), name="media")
+    # 音乐等媒体文件
+    _MEDIA_DIR = Path(__file__).resolve().parent / "media"
+    if _MEDIA_DIR.exists():
+        app.mount("/media", StaticFiles(directory=str(_MEDIA_DIR)), name="media")
 
-app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
+    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
 else:
     logger.warning(f"静态目录不存在，前端不可用: {_STATIC_DIR}")
