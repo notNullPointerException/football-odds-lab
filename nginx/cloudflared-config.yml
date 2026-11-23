@@ -1,0 +1,14 @@
+# Cloudflare Tunnel 配置
+# 用法：
+#   cloudflared tunnel --config nginx/cloudflared-config.yml run
+#
+# 或者临时测试：
+#   cloudflared tunnel --url http://127.0.0.1:8080
+
+tunnel: <你的tunnel-id>
+credentials-file: /Users/xian/.cloudflared/<tunnel-id>.json
+
+ingress:
+  - hostname: your-domain.trycloudflare.com   # 或你的正式域名
+    service: http://127.0.0.1:8080            # 指向 Nginx
+  - service: http_status:404
