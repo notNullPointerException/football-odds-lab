@@ -77,11 +77,11 @@ select {
   display: inline-block;
 }
 .ticker-inner.scrolling {
-  animation: marquee 12s linear forwards;
+  animation: marquee 15s linear forwards;
 }
 @keyframes marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  0% { transform: translateX(110%); }
+  100% { transform: translateX(-110%); }
 }
 
 
@@ -97,7 +97,7 @@ select {
 <div class="container" style="position:relative;">
   
   <div class="ticker" id="ticker">
-    <div class="ticker-inner" id="ticker-inner">加载中…</div>
+    <div class="ticker-inner" id="ticker-inner"></div>
   </div>
 
   <div class="card" id="user-card" style="position:relative;">
