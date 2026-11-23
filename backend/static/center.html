@@ -116,9 +116,17 @@ async function loadUser() {
     const me = await r.json();
     $("#uc-username").textContent = me.username || "-";
     $("#uc-role").textContent = me.role || "-";
-    $("#uc-expires").textContent = me.expires_at ? String(me.expires_at).slice(0,10) : "未开通";
+    const expEl = $("#uc-expires");
     if (me.role === "admin") {
+      expEl.textContent = "无限制";
+      expEl.style.color = "#f87171";
       document.querySelector(".card:last-of-type").style.display = "none";
+    } else if (!me.expires_at) {
+      expEl.textContent = "无限制";
+      expEl.style.color = "#f87171";
+    } else {
+      expEl.textContent = String(me.expires_at).slice(0,10);
+      expEl.style.color = "";
     }
   } catch(e) {
     location.href = "/login.html";
