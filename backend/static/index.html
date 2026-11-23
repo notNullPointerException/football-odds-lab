@@ -2319,7 +2319,7 @@ document.getElementById("adm-refresh")?.addEventListener("click", () => window.l
 document.getElementById("adm-users")?.addEventListener("click", async ev => {
   const b = ev.target.closest("button[data-toggle]");
   if (!b) return;
-  if (!confirm(`确认${b.textContent}用户「${b.dataset.name}」？`)) return;
+  if (!await styledConfirm("确认操作", `确认${b.textContent}用户「${b.dataset.name}」？`)) return;
   try {
     await api(`/api/auth/admin/users/${b.dataset.toggle}/toggle`, { method: "POST" });
     window.loadAdminUsers();
@@ -2931,6 +2931,56 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
   // 页面加载时也尝试加载一次验证码
   setTimeout(loadRegCaptchaSafe, 500);
 })();
+</script>
+
+
+<!-- 样式确认弹窗 -->
+<div id="styled-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:360px;max-width:90vw;">
+    <h3 id="styled-title" style="margin:0 0 12px;font-size:16px;">确认</h3>
+    <p id="styled-msg" style="color:var(--dim);margin-bottom:16px;font-size:14px;"></p>
+    <input id="styled-input" type="text" placeholder="" style="width:100%;margin-bottom:12px;display:none;padding:8px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="ghost" id="styled-cancel">取消</button>
+      <button class="act" id="styled-ok">确定</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// 样式弹窗
+window.styledConfirm = function(title, msg) {
+  return new Promise(resolve => {
+    const m = document.getElementById("styled-modal");
+    document.getElementById("styled-title").textContent = title;
+    document.getElementById("styled-msg").textContent = msg;
+    document.getElementById("styled-input").style.display = "none";
+    m.style.display = "flex";
+    const ok = document.getElementById("styled-ok");
+    const cancel = document.getElementById("styled-cancel");
+    const cleanup = () => { m.style.display = "none"; ok.onclick = null; cancel.onclick = null; };
+    ok.onclick = () => { cleanup(); resolve(true); };
+    cancel.onclick = () => { cleanup(); resolve(false); };
+  });
+};
+window.styledPrompt = function(title, placeholder) {
+  return new Promise(resolve => {
+    const m = document.getElementById("styled-modal");
+    document.getElementById("styled-title").textContent = title;
+    document.getElementById("styled-msg").textContent = "";
+    const inp = document.getElementById("styled-input");
+    inp.style.display = "block";
+    inp.value = "";
+    inp.placeholder = placeholder || "";
+    m.style.display = "flex";
+    const ok = document.getElementById("styled-ok");
+    const cancel = document.getElementById("styled-cancel");
+    const cleanup = () => { m.style.display = "none"; ok.onclick = null; cancel.onclick = null; };
+    ok.onclick = () => { cleanup(); resolve(inp.value); };
+    cancel.onclick = () => { cleanup(); resolve(null); };
+  });
+};
 </script>
 
 </body>
