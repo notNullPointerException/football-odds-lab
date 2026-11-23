@@ -2334,22 +2334,8 @@ document.getElementById("btn-close-pay")?.addEventListener("click", () => {
 document.getElementById("btn-close-login").onclick = () => {
   document.getElementById("login-modal").style.display = "none";
 };
-document.getElementById("btn-login").onclick = async () => {
-  const u = document.getElementById("login-user").value.trim();
-  const p = document.getElementById("login-pass").value;
-  const r = await fetch("/api/auth/login", {
-    method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({username:u, password:p})
-  });
-  const d = await r.json();
-  if (r.ok) {
-    _token = d.token; localStorage.setItem("token", _token);
-    document.getElementById("login-modal").style.display = "none";
-    alert("登录成功");
-    if (window.refreshAdminEntry) window.refreshAdminEntry();
-  } else {
-    document.getElementById("login-msg").textContent = d.detail || "登录失败";
-  }
+document.getElementById("btn-login").onclick = () => {
+  location.href = "/login.html";
 };
 document.getElementById("btn-register").onclick = async () => {
   document.getElementById("reg-plans").style.display = "block";
