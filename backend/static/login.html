@@ -294,13 +294,17 @@ document.addEventListener("keydown", e => {
     tryPlay();
     // 页面切回来时恢复
     document.addEventListener("visibilitychange", function(){
-      if(!document.hidden) tryPlay();
+      if(!document.hidden) setTimeout(tryPlay, 200);
     });
     // 意外暂停时恢复
     bgm.addEventListener("pause", function(){
-      if(!document.hidden) setTimeout(tryPlay, 100);
+      if(!document.hidden && !bgm.ended) setTimeout(tryPlay, 300);
     });
     bgm.addEventListener("ended", tryPlay);
+    // 定时检查，断了就续
+    setInterval(function(){
+      if(!document.hidden && bgm.paused && !bgm.ended) tryPlay();
+    }, 2000);
   }
   // 登录成功时停止
   var origLogin = document.getElementById("btn-login");
