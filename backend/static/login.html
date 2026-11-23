@@ -227,7 +227,9 @@ $("#btn-login").onclick = async () => {
     localStorage.setItem("token", d.token);
     location.href = "/";
   } else {
-    msg.textContent = d.detail || "登录失败"; loadLoginCaptcha();
+    msg.textContent = d.detail || "登录失败"; 
+    document.getElementById("login-captcha").value = "";
+    loadLoginCaptcha();
   }
 };
 
@@ -258,6 +260,7 @@ $("#btn-register").onclick = async () => {
     $("#login-user").value = u;
   } else {
     msg.textContent = d.detail || "注册失败";
+    document.getElementById("reg-captcha").value = "";
     loadCaptcha();
   }
 };
