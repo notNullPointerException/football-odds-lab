@@ -190,8 +190,10 @@ async function loadTicker() {
     $("#ticker-inner").textContent = "加载失败";
   }
 }
+let isScrolling = false;
 function showNextTicker() {
-  if (!tickerData.length) return;
+  if (!tickerData.length || isScrolling) return;
+  isScrolling = true;
   const d = tickerData[tickerIndex % tickerData.length];
   const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
   const inner = $("#ticker-inner");
@@ -201,14 +203,17 @@ function showNextTicker() {
   void inner.offsetWidth;
   inner.classList.add("scrolling");
   tickerIndex++;
-  // 动画 12 秒后清空，再等下一条
-  setTimeout(() => { inner.textContent = ""; inner.classList.remove("scrolling"); }, 12000);
-  // 第一条 5 秒，前几条 10-60 秒，之后 2-3 分钟
-  let delay;
-  if (tickerIndex === 1) delay = 5000;
-  else if (tickerIndex <= 3) delay = 10000 + Math.random() * 50000;
-  else delay = 120000 + Math.random() * 60000;
-  setTimeout(showNextTicker, delay);
+  // 12 秒滚动结束后清空，再等间隔才出下一条
+  setTimeout(() => {
+    inner.textContent = "";
+    inner.classList.remove("scrolling");
+    isScrolling = false;
+    // 计算下一条的等待时间
+    let delay;
+    if (tickerIndex <= 3) delay = 10000 + Math.random() * 50000;
+    else delay = 120000 + Math.random() * 60000;
+    setTimeout(showNextTicker, delay);
+  }, 12000);
 }
 
 $("#btn-recharge").onclick = () => {
