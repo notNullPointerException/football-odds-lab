@@ -63,11 +63,23 @@ select {
   margin-bottom: 24px;
   font-size: 15px;
   line-height: 48px;
-  padding: 0 20px;
   color: #a0a8b8;
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;
+  position: relative;
+}
+.ticker-inner {
+  position: absolute;
+  white-space: nowrap;
+  left: 100%;
+}
+.ticker-inner.run {
+  animation: scrollLeft 12s linear forwards;
+}
+@keyframes scrollLeft {
+  0% { left: 100%; transform: translateX(0); }
+  100% { left: 0; transform: translateX(-100%); }
 }
 .ticker {
   overflow: hidden;
@@ -194,21 +206,14 @@ function showNextTicker() {
   const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
   const inner = $("#ticker-inner");
   const fullText = `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`;
-  inner.textContent = "";
-  let i = 0;
-  const type = () => {
-    if (i < fullText.length) {
-      inner.textContent = fullText.slice(0, i + 1);
-      i++;
-      setTimeout(type, 150);
-    } else {
-      setTimeout(() => { inner.textContent = ""; }, 2000);
-    }
-  };
-  type();
+  inner.textContent = fullText;
+  inner.classList.remove("run");
+  void inner.offsetWidth;
+  inner.classList.add("run");
   tickerIndex++;
-  const totalTime = fullText.length * 150 + 2500;
   setTimeout(() => {
+    inner.textContent = "";
+    inner.classList.remove("run");
     isScrolling = false;
     // 计算下一条的等待时间
     let delay;
