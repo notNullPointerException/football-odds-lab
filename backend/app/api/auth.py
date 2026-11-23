@@ -266,7 +266,7 @@ def get_captcha(request: Request):
     cid = secrets.token_urlsafe(8)
     r = get_redis()
     if r:
-        r.setex(_captcha_key(cid), 300, code.lower())  # 5分钟有效
+        _store_captcha(cid, code)  # 5分钟有效
     # 生成图片
     img = Image.new("RGB", (160, 56), color=(30, 34, 43))
     draw = ImageDraw.Draw(img)
@@ -297,17 +297,32 @@ def get_captcha(request: Request):
     return Response(content=buf.getvalue(), media_type="image/png",
                     headers={"X-Captcha-Id": cid, "Access-Control-Expose-Headers": "X-Captcha-Id"})
 
+
+# 内存验证码兜底（Redis 不可用时）
+_mem_captcha = {}
+
+def _store_captcha(cid: str, code: str):
+    r = get_redis()
+    if r:
+        r.setex(_captcha_key(cid), 300, code.lower())
+    else:
+        _mem_captcha[cid] = code.lower()
+
 def verify_captcha(cid: str, code: str) -> bool:
     if not cid or not code:
         return False
+    code = code.lower().strip()
     r = get_redis()
-    if not r:
-        return False  # Redis 不可用时拒绝
-    stored = r.get(_captcha_key(cid))
-    if stored and stored == code.lower().strip():
-        r.delete(_captcha_key(cid))
-        return True
-    return False
+    if r:
+        stored = r.get(_captcha_key(cid))
+        if stored and stored == code:
+            r.delete(_captcha_key(cid))
+            return True
+        return False
+    # 内存兜底
+    stored = _mem_captcha.pop(cid, None)
+    return stored == code
+
 
 
 @router.post("/register")
