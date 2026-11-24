@@ -2260,7 +2260,7 @@ window.loadAdminUsers = async function loadAdminUsers() {
         : `<span style="color:var(--dim2)">非会员</span>`;
       const action = u.role === "admin"
         ? `<span class="hint">–</span>`
-        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button>`;
+        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button> <button class="ghost" data-reset="${u.id}" data-name="${esc(u.username)}">重置密码</button>`;
       return `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.role)}</td>` +
         `<td>${u.is_active ? "正常" : `<span style="color:var(--bad)">已禁用</span>`}</td>` +
         `<td>${member}</td><td>${exp}</td><td>${action}</td></tr>`;
@@ -2889,6 +2889,23 @@ document.addEventListener("click", function(e) {
   const fid = btn.dataset.fid;
   if (fid) {
     loadIntoPredict(parseInt(fid, 10));
+  }
+});
+</script>
+<script>
+document.getElementById("adm-users")?.addEventListener("click", async ev => {
+  const resetBtn = ev.target.closest("[data-reset]");
+  if (resetBtn) {
+    const id = resetBtn.dataset.reset;
+    const name = resetBtn.dataset.name;
+    if (!confirm(`确定重置用户 ${name} 的密码？`)) return;
+    try {
+      const res = await api(`/api/auth/admin/users/${id}/reset-password`, { method: "POST" });
+      alert(`密码已重置为：${res.body.password}`);
+    } catch(e) {
+      alert("重置失败：" + (e.message || e));
+    }
+    return;
   }
 });
 </script>
