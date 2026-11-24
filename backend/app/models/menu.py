@@ -7,7 +7,7 @@ from app.db.base import Base
 role_menus = Table(
     "role_menus",
     Base.metadata,
-    Column("role", String(20), primary_key=True),
+    Column("role", String(20), primary_key=True, index=True),
     Column("menu_id", Integer, ForeignKey("menus.id"), primary_key=True),
 )
 
