@@ -3004,20 +3004,63 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
 </script>
 
 <script>
-// 体彩页预测按钮
-document.addEventListener("click", function(e) {
+// 体彩页预测按钮 - 直接预测
+document.addEventListener("click", async function(e) {
   const btn = e.target.closest(".jc-predict");
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   const token = localStorage.getItem("token");
   if (!token) {
     location.href = "/login.html";
     return;
   }
   const fid = btn.dataset.fid;
-  if (fid) {
-    loadIntoPredict(parseInt(fid, 10));
+  if (!fid) return;
+  
+  // 禁用按钮，显示加载中
+  btn.disabled = true;
+  btn.textContent = "预测中...";
+  
+  try {
+    const res = await fetch(`/api/predict/${fid}`, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showModal(err.detail || "预测失败");
+      btn.textContent = "预测比赛";
+      btn.disabled = false;
+      return;
+    }
+    const data = await res.json();
+    // 预测完成，显示详情按钮
+    btn.textContent = "预测比赛";
+    btn.disabled = false;
+    // 在按钮后面添加详情按钮
+    let detailBtn = btn.nextElementSibling;
+    if (!detailBtn || !detailBtn.classList.contains("jc-detail")) {
+      detailBtn = document.createElement("button");
+      detailBtn.className = "ghost small jc-detail";
+      detailBtn.textContent = "详情";
+      detailBtn.dataset.fid = fid;
+      detailBtn.onclick = () => showPredictDetail(fid, data);
+      btn.parentNode.insertBefore(detailBtn, btn.nextSibling);
+    }
+    showModal("预测完成");
+  } catch(err) {
+    showModal("预测失败：" + err.message);
+    btn.textContent = "预测比赛";
+    btn.disabled = false;
   }
 });
+
+function showPredictDetail(fid, data) {
+  const result = data.result || data;
+  const msg = `比赛 ${fid}\n` +
+    `预测：${result.prediction || "-"}\n` +
+    `概率：主胜 ${((result.prob_home||0)*100).toFixed(1)}% 平 ${((result.prob_draw||0)*100).toFixed(1)}% 客胜 ${((result.prob_away||0)*100).toFixed(1)}%`;
+  showModal(msg);
+}
 </script>
 <script>
 document.getElementById("adm-users")?.addEventListener("click", async ev => {
