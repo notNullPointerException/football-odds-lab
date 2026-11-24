@@ -2301,7 +2301,10 @@ document.getElementById("btn-close-login").onclick = () => {
 document.getElementById("btn-login").onclick = () => {
   location.href = "/login.html";
 };
-document.getElementById("btn-register").onclick = async () => {
+document.getElementById("btn-register").onclick = () => {
+  location.href = "/login.html#register";
+  return;
+  // old code below
   document.getElementById("reg-plans").style.display = "block";
   const u = document.getElementById("login-user").value.trim();
   const p = document.getElementById("login-pass").value;
