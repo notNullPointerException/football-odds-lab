@@ -248,6 +248,23 @@ def _decide_by_code(cands: list, home_code: str, away_code: str,
                    f"（相似 {best_s:.2f}，{scope_long} {len(cands)} 候选{tail}）"}
 
 
+
+def _decide_fuzzy(cands: list, home_zh: str, away_zh: str) -> dict | None:
+    """模糊匹配：中文名包含关系或拼音相似度。"""
+    if not home_zh or not away_zh:
+        return None
+    home_zh = home_zh.strip()
+    away_zh = away_zh.strip()
+    for c in cands:
+        h = (c.get("home_zh") or "").strip()
+        a = (c.get("away_zh") or "").strip()
+        # 包含匹配：体彩名是库名的子串，或反过来
+        home_match = (home_zh in h or h in home_zh) and len(h) >= 2
+        away_match = (away_zh in a or a in away_zh) and len(a) >= 2
+        if home_match and away_match:
+            return {"fixture_id": c["id"], "how": f"模糊匹配 {h} vs {a}"}
+    return None
+
 def resolve(db, home_zh: str, away_zh: str, kickoff_str: str,
             day: str = None, num: str = None, overrides: dict = None,
             home_code: str = None, away_code: str = None) -> dict:
