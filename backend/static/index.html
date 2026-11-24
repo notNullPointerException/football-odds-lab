@@ -205,6 +205,27 @@
     margin-top:12px;background:rgba(255,95,109,.08);border:1px solid rgba(255,95,109,.35);
     color:#ffb3b9;border-radius:9px;padding:12px 14px;font-size:13px;white-space:pre-wrap;
   }
+  /* 隧道/网关瞬断时的兜底页：盖住整页，探测 /api/health，恢复后自动刷新 */
+  #tunnel-fallback{
+    display:none;position:fixed;inset:0;z-index:300;
+    background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);
+    align-items:center;justify-content:center;text-align:center;padding:24px;
+  }
+  #tunnel-fallback .tf-card{max-width:460px}
+  #tunnel-fallback .tf-emoji{font-size:64px;line-height:1;margin-bottom:20px;animation:tf-bounce 2s infinite}
+  @keyframes tf-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  #tunnel-fallback h1{font-size:26px;font-weight:600;margin:0 0 14px;color:#fff}
+  #tunnel-fallback p{font-size:15px;line-height:1.6;color:#a0a0a0;margin:0 0 10px}
+  #tunnel-fallback .tf-status{
+    display:inline-block;background:rgba(255,193,7,.15);color:#ffc107;
+    padding:6px 16px;border-radius:20px;font-size:13px;margin-top:16px;
+  }
+  #tunnel-fallback .tf-btn{
+    margin-top:18px;padding:9px 22px;border-radius:8px;border:1px solid var(--acc);
+    background:var(--acc);color:#04121f;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  #tunnel-fallback .tf-btn:hover{filter:brightness(1.1)}
+  #tunnel-fallback .tf-detail{margin-top:16px;font-size:11px;color:#666;word-break:break-all}
   .pager{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
   .pager .info{color:var(--dim);font-size:12px;margin-right:4px}
   .pager button.cur{background:var(--acc);color:#04121f;border-color:var(--acc);font-weight:600}
@@ -509,16 +530,114 @@ function withAuth(opts = {}) {
   return Object.assign({}, opts, { headers });
 }
 
+/* ---------------- 兜底页：隧道/网关瞬断 ----------------
+   典型场景：Cloudflare quick tunnel 抖一下，API 收到 530 + HTML 错误页。
+   页面本身已经加载，跳转也会失败，所以直接盖一层兜底页，后台探测
+   /api/health，恢复后自动刷新。                                      */
+const tunnelFallback = { el: null, timer: null, countdown: 5, polling: false };
+
+function ensureTunnelFallback() {
+  if (tunnelFallback.el) return tunnelFallback.el;
+  const el = document.createElement("div");
+  el.id = "tunnel-fallback";
+  el.setAttribute("role", "alert");
+  el.innerHTML = `
+    <div class="tf-card">
+      <div class="tf-emoji">🔌</div>
+      <h1>连接暂时中断</h1>
+      <p>页面还在，但与服务器的连接断开了。</p>
+      <p>通常是网络或隧道临时波动，恢复后会自动刷新。</p>
+      <div class="tf-status" id="tf-status">5 秒后自动重试…</div>
+      <button class="tf-btn" id="tf-retry" type="button">立即重试</button>
+      <div class="tf-detail" id="tf-detail"></div>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector("#tf-retry").addEventListener("click", retryTunnel);
+  tunnelFallback.el = el;
+  return el;
+}
+
+function showTunnelFallback(detail) {
+  if (!document.body) return;
+  const el = ensureTunnelFallback();
+  const d = el.querySelector("#tf-detail");
+  if (d) d.textContent = detail || "";
+  if (el.style.display === "flex") return;
+  el.style.display = "flex";
+  tunnelFallback.countdown = 5;
+  updateTunnelCountdown();
+  scheduleTunnelRetry();
+}
+
+function updateTunnelCountdown() {
+  const s = document.getElementById("tf-status");
+  if (s) s.textContent = `${tunnelFallback.countdown} 秒后自动重试…`;
+}
+
+function scheduleTunnelRetry() {
+  clearTimeout(tunnelFallback.timer);
+  tunnelFallback.timer = setTimeout(async () => {
+    tunnelFallback.countdown -= 1;
+    if (tunnelFallback.countdown > 0) {
+      updateTunnelCountdown();
+      scheduleTunnelRetry();
+      return;
+    }
+    await retryTunnel();
+  }, 1000);
+}
+
+async function retryTunnel() {
+  if (tunnelFallback.polling) return;
+  clearTimeout(tunnelFallback.timer);
+  tunnelFallback.polling = true;
+  const s = document.getElementById("tf-status");
+  if (s) s.textContent = "正在重试…";
+  let ok = false;
+  try {
+    const r = await fetch("/api/health", { cache: "no-store" });
+    const ct = (r.headers.get("content-type") || "").toLowerCase();
+    if (r.ok && ct.includes("application/json")) {
+      const b = await r.json().catch(() => null);
+      ok = !!(b && b.status === "ok");
+    }
+  } catch (e) {}
+  if (ok) {
+    if (s) s.textContent = "已恢复，正在重新加载…";
+    location.reload();
+    return;
+  }
+  tunnelFallback.polling = false;
+  tunnelFallback.countdown = 5;
+  updateTunnelCountdown();
+  scheduleTunnelRetry();
+}
+
 async function api(path, opts) {
   const t0 = performance.now();
   let res;
   try {
     res = await fetch(path, withAuth(opts));
   } catch (e) {
-    throw new Error(`网络错误：${e.message}`);
+    showTunnelFallback("网络连接失败");
+    const err = new Error(`网络错误：${e.message}`);
+    err.gateway = true;
+    err.detail = "网络连接失败";
+    throw err;
   }
   const ms = Math.round(performance.now() - t0);
   const text = await res.text();
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  const looksHtml = ct.includes("text/html") ||
+                    /^\s*(?:<!doctype\s+html|<html[\s>])/i.test(text);
+  if (looksHtml) {
+    const detail = `HTTP ${res.status} · 网关/隧道返回错误页`;
+    showTunnelFallback(detail);
+    const err = new Error("连接暂时中断");
+    err.status = res.status; err.ms = ms; err.body = text;
+    err.gateway = true; err.detail = detail;
+    throw err;
+  }
   let body;
   try { body = JSON.parse(text); } catch { body = text; }
 
@@ -797,6 +916,11 @@ async function loadJc(force) {
     renderJcDays();
     renderJcMatches();
   } catch (e) {
+    if (e.gateway) {
+      // api() 已经盖了兜底页；别再往页面里塞整段 Cloudflare HTML
+      meta.textContent = "连接中断";
+      return;
+    }
     out.innerHTML = `<div class="err">体彩接口拉取失败\n${esc(e.message)}</div>`;
     meta.textContent = "体彩接口异常";
   } finally {
