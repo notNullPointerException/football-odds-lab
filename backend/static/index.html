@@ -3160,5 +3160,22 @@ function showModal(msg, opts = {}) {
 }
 </script>
 
+
+<script>
+function renderPredictResult(data) {
+  const out = document.getElementById("predict-out");
+  if (!out) return;
+  const r = data.result || data;
+  out.innerHTML = `<div class="card">
+    <h3>预测结果</h3>
+    <div class="row"><span>预测</span><b>${r.prediction || "-"}</b></div>
+    <div class="row"><span>主胜</span><b>${((r.prob_home||0)*100).toFixed(1)}%</b></div>
+    <div class="row"><span>平</span><b>${((r.prob_draw||0)*100).toFixed(1)}%</b></div>
+    <div class="row"><span>客胜</span><b>${((r.prob_away||0)*100).toFixed(1)}%</b></div>
+    ${r.llm_analysis ? `<div class="hint" style="margin-top:12px">${r.llm_analysis}</div>` : ""}
+  </div>`;
+}
+</script>
+
 </body>
 </html>
