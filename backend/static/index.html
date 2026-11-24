@@ -2453,78 +2453,9 @@ setInterval(loadTicker, 5 * 60 * 1000);
 
 
 <script>
-// ── 个人中心 ──
 document.getElementById("btn-user-center")?.addEventListener("click", () => {
   location.href = "/center.html";
-  return;
 });
-// old modal code below (disabled)
-  async function _old() {
-  const modal = document.getElementById("user-center-modal");
-  if (!modal) { alert("个人中心组件未找到"); return; }
-  modal.style.display = "flex";
-  modal.style.zIndex = "9999";
-  let me = null;
-  try { 
-    const fn = window.checkAuth || (typeof checkAuth === "function" ? checkAuth : null);
-    if (fn) me = await fn(); 
-  } catch(e) { console.error("checkAuth error", e); }
-  if (me) {
-    document.getElementById("uc-guest").style.display = "none";
-    document.getElementById("uc-logged").style.display = "block";
-    document.getElementById("uc-username").textContent = me.username;
-    document.getElementById("uc-role").textContent = me.role;
-    document.getElementById("uc-expires").textContent = me.expires_at ? me.expires_at.slice(0,10) : "永久";
-  } else {
-    document.getElementById("uc-guest").style.display = "block";
-    document.getElementById("uc-logged").style.display = "none";
-  }
-document.getElementById("btn-close-uc")?.addEventListener("click", () => {
-  document.getElementById("user-center-modal").style.display = "none";
-});
-document.getElementById("uc-to-login")?.addEventListener("click", () => {
-  document.getElementById("user-center-modal").style.display = "none";
-  document.getElementById("login-page").style.display = "flex";
-});
-document.getElementById("uc-to-login-old")?.addEventListener("click", () => {
-  document.getElementById("user-center-modal").style.display = "none";
-  document.getElementById("login-modal").style.display = "flex";
-});
-document.getElementById("uc-to-register")?.addEventListener("click", () => {
-  document.getElementById("user-center-modal").style.display = "none";
-  document.getElementById("register-page").style.display = "flex";
-  loadRegCaptcha();
-});
-document.getElementById("uc-to-register-old")?.addEventListener("click", () => {
-  document.getElementById("user-center-modal").style.display = "none";
-  document.getElementById("login-modal").style.display = "flex";
-  document.getElementById("reg-plans").style.display = "block";
-  if (typeof loadCaptcha === "function") loadCaptcha();
-});
-document.getElementById("btn-recharge")?.addEventListener("click", () => {
-  const plan = document.getElementById("recharge-plan").value;
-  document.getElementById("user-center-modal").style.display = "none";
-  document.getElementById("pay-modal").style.display = "flex";
-  alert("请扫码支付后联系管理员激活/续费（套餐：" + plan + "）");
-});
-
-async function loadTicker() {
-  try {
-    const r = await fetch("/api/auth/recharge-ticker");
-    const data = await r.json();
-    const inner = document.getElementById("ticker-inner");
-    if (!inner || !data.length) return;
-    const plans = {week:"周卡", month:"月卡", quarter:"季卡", year:"年卡"};
-    const html = data.map(d => 
-      `${d.username} 在 ${d.time} 充值了${plans[d.plan]||d.plan} ¥${d.amount}`
-    ).join("　　");
-    inner.textContent = html + "　　" + html;  // 循环
-  } catch(e) {}
-}
-// 打开支付弹窗时加载，并每5分钟刷新
-
-setInterval(loadTicker, 5 * 60 * 1000);
-
 </script>
 
 
