@@ -1035,12 +1035,7 @@ function renderJcMatches() {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <div class="hint" style="margin-top:10px">
-      ${esc(d.weekday)} ${esc(d.business_date)} 销售日 · 共 <b class="num">${d.count}</b> 场${offHad ? ` · 其中 ${offHad} 场未开胜平负` : ""}
-      · 大字为去水概率，@ 后为体彩原始赔率
-      ${hasLink ? " · 蓝色编号可点，直达「预测」页"
-                : " · id 显示「–」= 队名没认出来（补 teams.name_zh 或写 jc_overrides.json）"}
-    </div>`;
+    `;
 
   $$("a.jump", out).forEach(a => a.onclick = ev => {
     ev.preventDefault();
