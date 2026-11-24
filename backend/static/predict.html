@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>预测详情</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root { --bg:#0f1115; --panel:#1a1d24; --line:#2a2e38; --text:#e8eaed; --dim:#8b93a5; --accent:#3b82f6; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+.wrap { max-width:600px; margin:40px auto; padding:20px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:24px; }
+h2 { margin:0 0 20px; }
+.row { display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line); }
+.row:last-child { border-bottom:none; }
+.row span { color:var(--dim); }
+.loading { text-align:center; padding:40px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="content">
+    <div class="loading">加载中...</div>
+  </div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const fid = params.get("fid");
+const token = localStorage.getItem("token");
+
+async function load() {
+  if (!fid) {
+    document.getElementById("content").innerHTML = '<div class="loading">缺少比赛 ID</div>';
+    return;
+  }
+  if (!token) {
+    location.href = "/login.html";
+    return;
+  }
+  try {
+    const r = await fetch(`/api/predictions?fixture_id=${fid}`, {
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (!r.ok) {
+      document.getElementById("content").innerHTML = '<div class="loading">未找到预测记录</div>';
+      return;
+    }
+    const data = await r.json();
+    const items = data.items || data;
+    const item = Array.isArray(items) ? items[0] : items;
+    if (!item) {
+      document.getElementById("content").innerHTML = '<div class="loading">未找到预测记录</div>';
+      return;
+    }
+    document.getElementById("content").innerHTML = `
+      <h2>预测详情 #${fid}</h2>
+      <div class="row"><span>预测</span><b>${item.prediction || "-"}</b></div>
+      <div class="row"><span>主胜</span><b>${((item.prob_home||0)*100).toFixed(1)}%</b></div>
+      <div class="row"><span>平</span><b>${((item.prob_draw||0)*100).toFixed(1)}%</b></div>
+      <div class="row"><span>客胜</span><b>${((item.prob_away||0)*100).toFixed(1)}%</b></div>
+      ${item.llm_analysis ? `<div style="margin-top:16px;color:var(--dim);font-size:14px">${item.llm_analysis}</div>` : ""}
+    `;
+  } catch(e) {
+    document.getElementById("content").innerHTML = '<div class="loading">加载失败</div>';
+  }
+}
+load();
+</script>
+</body>
+</html>

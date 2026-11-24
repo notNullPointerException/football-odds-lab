@@ -860,6 +860,10 @@ function switchTab(name) {
   $("#tab-predict").hidden = name !== "predict";
   $("#tab-history").hidden = name !== "history";
   $("#tab-admin").hidden   = name !== "admin";
+  if (name === "predict") {
+    const out = document.getElementById("predict-out");
+    if (out && !out.dataset.keep) out.innerHTML = '<div class="empty">输入比赛 ID 或从体彩/胜负14场页点击「预测比赛」</div>';
+  }
   if (name === "jc" && !jc.loaded) loadJc(false);
   if (name === "sfc" && !sfc.loaded) loadSfc(false);
   if (name === "history" && !state.loaded) loadHistory(1);
@@ -3052,7 +3056,7 @@ document.addEventListener("click", async function(e) {
       detailBtn.style.display = "inline-block";
       detailBtn.textContent = "预测详情";
       detailBtn.dataset.fid = fid;
-      detailBtn.onclick = () => { switchTab("predict"); renderPredictResult(data); };
+      detailBtn.onclick = () => { window.open("/predict.html?fid=" + fid, "_blank"); };
       btn.parentNode.insertBefore(detailBtn, btn.nextSibling);
     }
     showModal("预测完成");
