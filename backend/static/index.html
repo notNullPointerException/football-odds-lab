@@ -1639,6 +1639,12 @@ async function rerunOneSfc(fid) {
    在途锁用 sfc.running：按钮 disabled 挡不住回车键。 */
 async function runSfcPredict() {
   if (sfc.running) return;
+  // 未登录提示，不跳转
+  const token = localStorage.getItem("token");
+  if (!token) {
+    alert("请先登录后再进行预测");
+    return;
+  }
   const ms = (sfc.payload && sfc.payload.matches) || [];
   const fids = ms.map(m => m.fixture_id).filter(Boolean);
   if (!fids.length) return;
