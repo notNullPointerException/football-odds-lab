@@ -2311,26 +2311,6 @@ document.getElementById("btn-login").onclick = () => {
 };
 document.getElementById("btn-register").onclick = () => {
   location.href = "/login.html#register";
-  return;
-  // old code below
-  document.getElementById("reg-plans").style.display = "block";
-  const u = document.getElementById("login-user").value.trim();
-  const p = document.getElementById("login-pass").value;
-  const plan = document.getElementById("reg-plan-sel")?.value || "week";
-  const cid = document.getElementById("captcha-img")?.dataset.cid || "";
-  const ccode = document.getElementById("captcha-code")?.value.trim() || "";
-  const r = await fetch("/api/auth/register", {
-    method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({username:u, password:p, plan:plan, captcha_id:cid, captcha_code:ccode})
-  });
-  const d = await r.json();
-  if (r.ok) {
-    _token = d.token; localStorage.setItem("token", _token);
-    document.getElementById("login-modal").style.display = "none";
-    alert("注册成功，已登录（浏览免费；预测功能需开通会员）");
-  } else {
-    document.getElementById("login-msg").textContent = d.detail || "注册失败";
-  }
 };
 
 // 拦截需要登录的按钮
