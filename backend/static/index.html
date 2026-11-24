@@ -2897,15 +2897,14 @@ document.getElementById("adm-users")?.addEventListener("click", async ev => {
     const id = resetBtn.dataset.reset;
     const name = resetBtn.dataset.name;
     showModal(`确定重置用户 ${name} 的密码？`, { confirm: true, onOk: async () => {
-    try {
-      const res = await api(`/api/auth/admin/users/${id}/reset-password`, { method: "POST" });
-      showModal(`密码已重置为：${res.body.password}`);
-    } catch(e) {
-      showModal("重置失败：" + (e.message || e));
-    }
+      try {
+        const res = await api(`/api/auth/admin/users/${id}/reset-password`, { method: "POST" });
+        showModal(`密码已重置为：${res.body.password}`);
+      } catch(e) {
+        showModal("重置失败：" + (e.message || e));
+      }
+    }});
     return;
-  }
-});
 </script>
 
 <script>
