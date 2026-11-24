@@ -298,6 +298,11 @@ def resolve(db, home_zh: str, away_zh: str, kickoff_str: str,
     if r["fixture_id"]:
         return r
 
+    # 模糊匹配兜底
+    rf = _decide_fuzzy(cands, home_zh, away_zh)
+    if rf:
+        return rf
+
     rc = _decide_by_code(cands, home_code, away_code)
     if rc:
         # 把队名那次的判词接在理由后面 —— 两条信号打架时，回溯时必须看得见另一条。
