@@ -2289,12 +2289,12 @@ document.getElementById("adm-refresh")?.addEventListener("click", () => window.l
 document.getElementById("adm-users")?.addEventListener("click", async ev => {
   const b = ev.target.closest("button[data-toggle]");
   if (!b) return;
-  if (!confirm(`确认${b.textContent}用户「${b.dataset.name}」？`)) return;
+  showModal(`确认${b.textContent}用户「${b.dataset.name}」？`, { confirm: true, onOk: () => { /* continue */ } }); return;
   try {
     await api(`/api/auth/admin/users/${b.dataset.toggle}/toggle`, { method: "POST" });
     window.loadAdminUsers();
   } catch (e) {
-    alert("操作失败：" + (e.detail || e.message));
+    showModal("操作失败：" + (e.detail || e.message));
   }
 });
 // window.refreshAdminEntry(); // removed
@@ -2538,7 +2538,7 @@ document.getElementById("btn-do-register")?.addEventListener("click", async () =
   const d = await r.json();
   if (r.ok) {
     document.getElementById("register-page").style.display = "none";
-    alert("注册成功，请登录后在个人中心充值");
+    showModal("注册成功，请登录后在个人中心充值");
   } else {
     msg.textContent = d.detail || "注册失败";
     loadRegCaptcha();
@@ -2632,7 +2632,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
 (function(){
   function openCenter(){
     var m = document.getElementById("user-center-modal");
-    if(!m){ alert("个人中心未加载"); return; }
+    if(!m){ showModal("个人中心未加载"); return; }
     m.style.display = "flex";
     m.style.zIndex = "99999";
     var guest = document.getElementById("uc-guest");
@@ -2693,7 +2693,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
         lp.style.display = "flex";
         lp.style.zIndex = "10000";
       } else {
-        alert("登录页面未加载");
+        showModal("登录页面未加载");
       }
     };
   }
@@ -2709,7 +2709,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
         rp.style.zIndex = "10000";
         if(typeof loadRegCaptcha === "function") loadRegCaptcha();
       } else {
-        alert("注册页面未加载");
+        showModal("注册页面未加载");
       }
     };
   }
@@ -2770,7 +2770,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
         var d = await r.json();
         if(r.ok){
           document.getElementById("register-page").style.display = "none";
-          alert("注册成功，请登录后在个人中心充值");
+          showModal("注册成功，请登录后在个人中心充值");
         } else {
           if(msg) msg.textContent = d.detail || "注册失败";
           loadRegCaptchaSafe();
@@ -2865,7 +2865,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
   btn.onclick = function(e) {
     const now = Date.now();
     if (now - lastRun < 60000) {
-      alert("请等待 " + Math.ceil((60000 - (now - lastRun)) / 1000) + " 秒后再试");
+      showModal("请等待 " + Math.ceil((60000 - (now - lastRun)) / 1000) + " 秒后再试");
       return;
     }
     lastRun = now;
@@ -2896,12 +2896,12 @@ document.getElementById("adm-users")?.addEventListener("click", async ev => {
   if (resetBtn) {
     const id = resetBtn.dataset.reset;
     const name = resetBtn.dataset.name;
-    if (!confirm(`确定重置用户 ${name} 的密码？`)) return;
+    showModal(`确定重置用户 ${name} 的密码？`, { confirm: true, onOk: async () => {
     try {
       const res = await api(`/api/auth/admin/users/${id}/reset-password`, { method: "POST" });
-      alert(`密码已重置为：${res.body.password}`);
+      showModal(`密码已重置为：${res.body.password}`);
     } catch(e) {
-      alert("重置失败：" + (e.message || e));
+      showModal("重置失败：" + (e.message || e));
     }
     return;
   }
@@ -2937,6 +2937,43 @@ document.getElementById("adm-users")?.addEventListener("click", async ev => {
     });
   } catch(e) { console.error("load menus failed", e); }
 })();
+</script>
+
+
+<!-- Custom Modal -->
+<div id="custom-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--panel);border-radius:12px;padding:24px;min-width:280px;max-width:400px;text-align:center;">
+    <p id="modal-msg" style="margin:0 0 20px;font-size:15px;"></p>
+    <div id="modal-btns" style="display:flex;gap:12px;justify-content:center;"></div>
+  </div>
+</div>
+<script>
+function showModal(msg, opts = {}) {
+  const modal = document.getElementById("custom-modal");
+  const msgEl = document.getElementById("modal-msg");
+  const btnsEl = document.getElementById("modal-btns");
+  msgEl.textContent = msg;
+  btnsEl.innerHTML = "";
+  if (opts.confirm) {
+    const cancel = document.createElement("button");
+    cancel.className = "ghost";
+    cancel.textContent = "取消";
+    cancel.onclick = () => { modal.style.display = "none"; opts.onCancel && opts.onCancel(); };
+    const ok = document.createElement("button");
+    ok.className = "act";
+    ok.textContent = "确定";
+    ok.onclick = () => { modal.style.display = "none"; opts.onOk && opts.onOk(); };
+    btnsEl.appendChild(cancel);
+    btnsEl.appendChild(ok);
+  } else {
+    const ok = document.createElement("button");
+    ok.className = "act";
+    ok.textContent = "确定";
+    ok.onclick = () => { modal.style.display = "none"; opts.onOk && opts.onOk(); };
+    btnsEl.appendChild(ok);
+  }
+  modal.style.display = "flex";
+}
 </script>
 
 </body>
