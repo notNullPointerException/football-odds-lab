@@ -517,3 +517,21 @@ def recharge_ticker(db: Session = Depends(get_db)):
         }
         for r in rows
     ]
+
+
+@router.get("/menus")
+def get_menus(
+    db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user),
+):
+    """Get menus for current user based on role. Guest gets user menus."""
+    from app.models.menu import Menu, role_menus
+    role = user.role if user else "user"
+    # Guest and non-member get basic menus
+    if not user:
+        role = "user"
+    menus = db.query(Menu).join(role_menus).filter(
+        role_menus.c.role == role,
+        Menu.is_active == True
+    ).order_by(Menu.sort_order).all()
+    return [{"code": m.code, "name": m.name} for m in menus]
