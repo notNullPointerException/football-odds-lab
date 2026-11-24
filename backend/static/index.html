@@ -1141,7 +1141,7 @@ function renderJcMatches() {
       </td>
       <td>${oddsCells(m.had, [["主胜","p_h","h"],["平","p_d","d"],["客胜","p_a","a"]])}</td>
       <td>${oddsCells(m.hhad, [["让胜","p_h","h"],["让平","p_d","d"],["让负","p_a","a"]])}${line}</td>
-      <td>${m.fixture_id ? `<button class="act small jc-predict" data-fid="${esc(m.fixture_id)}">预测比赛</button>` : "-"}</td>
+      <td style="white-space:nowrap">${m.fixture_id ? `<button class="act small jc-predict" data-fid="${esc(m.fixture_id)}">预测比赛</button>` : "-"}</td>
     </tr>`;
   }).join("");
 
@@ -3048,7 +3048,8 @@ document.addEventListener("click", async function(e) {
       detailBtn = document.createElement("button");
       detailBtn.className = "act small jc-detail";
       detailBtn.style.background = "#f87171";
-      detailBtn.style.marginLeft = "4px";
+      detailBtn.style.marginLeft = "8px";
+      detailBtn.style.display = "inline-block";
       detailBtn.textContent = "预测详情";
       detailBtn.dataset.fid = fid;
       detailBtn.onclick = () => { switchTab("predict"); renderPredictResult(data); };
