@@ -1843,7 +1843,7 @@ async function loadHistory(page) {
     if (seq !== historySeq) return;
     // 预测记录是会员内容：401=没登录、403=没开会员，给引导而不是红字报错
     if (e.status === 401) {
-      out.innerHTML = `<div class="empty">登录后可查看预测记录</div>`;
+      out.innerHTML = `<div class="empty">暂无历史记录</div>`;
     } else if (e.status === 403) {
       out.innerHTML = `<div class="empty">开通会员后可查看预测记录</div>`;
     } else {
