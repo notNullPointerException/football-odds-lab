@@ -3013,6 +3013,9 @@ document.addEventListener("click", async function(e) {
     location.href = "/login.html";
     return;
   }
+  // 检查会员状态
+  const me = await window.ensureMember();
+  if (!me) return;
   const fid = btn.dataset.fid;
   if (!fid) return;
   
@@ -3054,7 +3057,10 @@ document.addEventListener("click", async function(e) {
   }
 });
 
-function showPredictDetail(fid, data) {
+async function showPredictDetail(fid, data) {
+  // 检查会员状态
+  const me = await window.ensureMember();
+  if (!me) return;
   const result = data.result || data;
   const msg = `比赛 ${fid}\n` +
     `预测：${result.prediction || "-"}\n` +
