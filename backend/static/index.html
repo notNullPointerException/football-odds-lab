@@ -1769,8 +1769,8 @@ async function runPredict() {
     btn.disabled = false;
   }
 }
-$("#run").onclick = runPredict;
-$("#fid").addEventListener("keydown", e => { if (e.key === "Enter") runPredict(); });
+document.getElementById("run") && (document.getElementById("run").onclick = runPredict);
+document.getElementById("fid")?.addEventListener("keydown", e => { if (e.key === "Enter") runPredict(); });
 
 /* ---------------- 历史预测 ---------------- */
 const state = { page: 1, size: 20, date: "", cat: "", total: 0, loaded: false };
@@ -2479,7 +2479,6 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
     document.getElementById("uc-guest").style.display = "block";
     document.getElementById("uc-logged").style.display = "none";
   }
-});
 document.getElementById("btn-close-uc")?.addEventListener("click", () => {
   document.getElementById("user-center-modal").style.display = "none";
 });
