@@ -78,7 +78,6 @@ async def get_predictions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    _member=Depends(require_member),
 ):
     return await asyncio.to_thread(
         _get_predictions_sync, db, date, category, page, page_size
