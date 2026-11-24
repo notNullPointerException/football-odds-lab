@@ -1783,7 +1783,7 @@ async function runSfcPredict() {
     return;
   }
   // 先弹窗提示
-  showModal("胜负14场 AI 批量预测引擎启动\n\n正在调用 XGBoost 集成学习模型对 14 场比赛进行并行特征工程，结合 Poisson 回归计算各场进球期望，同步拉取球员伤停名单、近期赛程密度、主客场攻防数据等核心指标。\n\n多模型融合推理中，预计耗时 3～5 分钟，请耐心等待...", {
+  showModal(`胜负14场 AI 批量预测引擎启动\n\n正在调用 XGBoost 集成学习模型对 14 场比赛进行并行特征工程，结合 Poisson 回归计算各场进球期望，同步拉取球员伤停名单、近期赛程密度、主客场攻防数据等核心指标。\n\n多模型融合推理中，预计耗时 3～5 分钟，请耐心等待...`, {
     onOk: () => doSfcPredict()
   });
   return;
@@ -3033,11 +3033,7 @@ document.addEventListener("click", async function(e) {
   
   // 禁用按钮，显示加载中
   // 先弹窗提示
-  showModal("AI 预测引擎启动中
-
-正在调用 XGBoost 梯度提升模型进行多维度特征分析，结合 Poisson 分布计算进球概率，同步检索球员伤停、近期状态、历史交锋、主客场战绩等 200+ 特征维度。
-
-AI 大模型正在综合研判，预计耗时 1～3 分钟，请耐心等待...", {
+  showModal(`AI 预测引擎启动中\n\n正在调用 XGBoost 梯度提升模型进行多维度特征分析，结合 Poisson 分布计算进球概率，同步检索球员伤停、近期状态、历史交锋、主客场战绩等 200+ 特征维度。\n\nAI 大模型正在综合研判，预计耗时 1～3 分钟，请耐心等待...`, {
     onOk: async () => {
       btn.disabled = true;
       btn.innerHTML = '<span class="spin"></span>';
