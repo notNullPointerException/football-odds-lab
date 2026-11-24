@@ -352,7 +352,7 @@
 </header>
 
 <main>
-  <!-- ============ 体彩（实时，默认页） ============ -->
+  
   <section id="tab-jc">
     <div class="bar">
       <span class="hint" id="jc-meta">加载中 …</span>
@@ -364,13 +364,13 @@
     <div id="jc-out"></div>
   </section>
 
-  <!-- ============ 胜负彩 14 场（实时） ============ -->
+  
   <section id="tab-sfc" hidden>
     <div class="bar">
       <span class="hint" id="sfc-meta">加载中 …</span>
       <span style="margin-left:auto"></span>
       <button class="act" id="sfc-run"
-        title="对本期 14 场并行调 POST /api/predict/{id}，跑完自动写回各自的格子；约 30~60 秒">跑 14 场预测</button>
+        >跑 14 场预测</button>
       <button class="act" id="sfc-archive"
         title="把本期 14 场 + 赛前预测快照存进库，开奖后在「历史」页的【分类=胜负14场】看复盘。打开本页时会自动存一次，这个按钮是手动补一炮">存档本期</button>
       <button class="act" id="sfc-refresh">刷新</button>
@@ -385,22 +385,22 @@
     <div id="sfc-out"></div>
   </section>
 
-  <!-- ============ 预测 ============ -->
+  
   <section id="tab-predict">
     <div class="bar">
       <label for="fid">fixture_id</label>
       <input id="fid" type="number" placeholder="如 1570390" autocomplete="off">
       <button class="act" id="run">开始预测</button>
-      <span class="hint">POST /api/predict/{id} — 跑 XGB + 拉伤停首发 + 调 LLM，约 30~60 秒，完成后写入 predictions 表</span>
+      
     </div>
     <div id="predict-out"></div>
   </section>
 
-  <!-- ============ 历史 ============ -->
+  
   <section id="tab-history" hidden>
     <div class="bar">
       <label for="h-date">批次日</label>
-      <input id="h-date" type="date" title="按批次日筛选：当天 10:10 至次日 10:10 算一批（与体彩销售日口径一致）。凌晨开球的比赛归属前一天批次。">
+      <input id="h-date" type="date" >
       <label for="h-cat">分类</label>
       <select id="h-cat" title="竞彩=按场次的预测记录；胜负14场=按期号的一期一卡复盘（另一套接口 /api/sfc/issues）">
         <option value="">全部</option>
@@ -414,13 +414,13 @@
       <button class="act" id="h-search">查询</button>
       <button class="ghost" id="h-reset">重置</button>
       <span class="hint" id="h-total"></span>
-      <span class="hint" style="flex-basis:100%">批次日 = 当天 10:10 至次日 10:10（与体彩销售日同口径）；凌晨开球的比赛归前一天批次。</span>
+      
     </div>
     <div id="history-out"></div>
     <div class="pager" id="h-pager"></div>
   </section>
 
-  <!-- ============ 管理（仅 admin 可见） ============ -->
+  
   <section id="tab-admin" hidden>
     <div class="bar">
       <label for="adm-username">用户名</label>
@@ -2202,7 +2202,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
 
 </script>
 
-<!-- 登录弹窗 -->
+
 <div id="login-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:340px;">
     <h3 style="margin:0 0 16px">登录 / 注册</h3>
@@ -2435,7 +2435,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
 </script>
 
 
-<!-- 支付宝支付弹窗 -->
+
 <div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:110;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:320px;text-align:center;">
     <h3 style="margin:0 0 12px">请扫码支付</h3>
@@ -2458,7 +2458,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
 </div>
 
 
-<!-- 个人中心 -->
+
 <div id="user-center-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:32px;width:480px;max-width:90vw;">
     <h3 style="margin:0 0 16px">个人中心</h3>
@@ -2572,7 +2572,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
 </script>
 
 
-<!-- 登录页面 -->
+
 <div id="login-page" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:340px;">
     <h3 style="margin:0 0 20px;text-align:center">登录</h3>
@@ -2592,7 +2592,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
   </div>
 </div>
 
-<!-- 注册页面 -->
+
 <div id="register-page" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:360px;">
     <h3 style="margin:0 0 16px;text-align:center">注册</h3>
