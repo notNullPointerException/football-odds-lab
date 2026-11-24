@@ -116,7 +116,7 @@ select {
     <div class="info-row"><span class="label">到期</span><span class="value" id="uc-expires">-</span></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="recharge-card" style="display:none;">
     <h2>充值会员</h2>
     <select id="recharge-plan">
       <option value="week">周卡 · ¥188</option>
@@ -144,8 +144,9 @@ async function loadUser() {
     if (me.role === "admin") {
       expEl.textContent = "无限制";
       expEl.style.color = "#f87171";
-      document.querySelector(".card:last-of-type").style.display = "none";
-    } else if (!me.expires_at) {
+    } else {
+      document.getElementById("recharge-card").style.display = "block";
+      if (!me.expires_at) {
       expEl.textContent = "未开通";
       expEl.style.color = "#8b93a5";
     } else {
