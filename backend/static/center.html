@@ -150,24 +150,24 @@ async function loadUser() {
         expEl.textContent = "未开通";
         expEl.style.color = "#8b93a5";
       } else {
-      // 倒计时
-      const exp = new Date(me.expires_at);
-      function updateCountdown() {
-        const now = new Date();
-        const diff = exp - now;
-        if (diff <= 0) {
-          expEl.textContent = "已过期";
-          expEl.style.color = "#f87171";
-          return;
+        const exp = new Date(me.expires_at);
+        function updateCountdown() {
+          const now = new Date();
+          const diff = exp - now;
+          if (diff <= 0) {
+            expEl.textContent = "已过期";
+            expEl.style.color = "#f87171";
+            return;
+          }
+          const d = Math.floor(diff / 86400000);
+          const h = Math.floor((diff % 86400000) / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          expEl.textContent = d + "天 " + h + "小时 " + m + "分";
+          expEl.style.color = d < 3 ? "#f87171" : "#4ade80";
         }
-        const d = Math.floor(diff / 86400000);
-        const h = Math.floor((diff % 86400000) / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        expEl.textContent = d + "天 " + h + "小时 " + m + "分";
-        expEl.style.color = d < 3 ? "#f87171" : "#4ade80";
+        updateCountdown();
+        setInterval(updateCountdown, 60000);
       }
-      updateCountdown();
-      setInterval(updateCountdown, 60000);
     }
   } catch(e) {
     location.href = "/login.html";
