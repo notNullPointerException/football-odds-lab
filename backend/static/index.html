@@ -3024,9 +3024,18 @@ document.addEventListener("click", async function(e) {
   if (!fid) return;
   
   // 禁用按钮，显示加载中
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>';
-  
+  // 先弹窗提示
+  showModal("AI 正在分析比赛数据、伤停信息、历史交锋等，预计需要 1～3 分钟，请耐心等待...", {
+    onOk: async () => {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spin"></span>';
+      await doPredict(btn, fid, token);
+    }
+  });
+  return;
+}
+
+async function doPredict(btn, fid, token) {
   try {
     const res = await fetch(`/api/predict/${fid}`, {
       method: "POST",
@@ -3065,7 +3074,7 @@ document.addEventListener("click", async function(e) {
     btn.textContent = "预测比赛";
     btn.disabled = false;
   }
-});
+}
 
 async function showPredictDetail(fid, data) {
   // 检查会员状态
