@@ -1584,7 +1584,7 @@ $("#sfc-archive").onclick = async () => {
 async function runOneSfcPredict(fid) {
   const token = localStorage.getItem("token");
   if (!token) {
-    alert("请先登录后再进行预测");
+    location.href = "/login.html";
     return false;
   }
   const at = "跑于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -1642,7 +1642,7 @@ async function runSfcPredict() {
   // 未登录提示，不跳转
   const token = localStorage.getItem("token");
   if (!token) {
-    alert("请先登录后再进行预测");
+    location.href = "/login.html";
     return;
   }
   const ms = (sfc.payload && sfc.payload.matches) || [];
@@ -2883,7 +2883,7 @@ document.addEventListener("click", function(e) {
   if (!btn) return;
   const token = localStorage.getItem("token");
   if (!token) {
-    alert("请先登录后再进行预测");
+    location.href = "/login.html";
     return;
   }
   const fid = btn.dataset.fid;
