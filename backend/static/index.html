@@ -1259,29 +1259,6 @@ function renderSfcBody() {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <div class="hint" style="margin-top:10px">
-      第 ${esc(d.issue || "–")} 期 ${esc(d.lottery_name || "胜负游戏")} · 共
-      <b class="num">${d.total_count}</b> 场${offHad ? ` · 其中 ${offHad} 场体彩未开赔率` : ""}
-      · 大字为去水概率，@ 后为原始赔率
-      · 彩果 3=主胜 1=平 0=客胜
-      <br>
-      庄家盘 = 预测时落库的盘（<b>Pinnacle 优先</b>，缺了才退 Bet365/Betfair ——
-      具体哪家看格子里的名字），同 <code>/api/predictions</code> 的 market 块同源
-      ${offBook ? ` · ${offBook} 场没有：这些场还没跑过预测` : ""}
-      ${bothCnt ? `<br>「水」= 庄家去水 − 体彩去水（百分点），<b class="num">正数才是体彩给高了</b>；
-        但体彩是实时的、庄家盘是预测那一刻的快照，两边时刻不同，
-        <b>1~2pp 是噪声</b>，别拿小数当信号 —— 它只是参照，不是结论` : ""}
-      <br>
-      接口预测 = 点上面的按钮现场跑的（<code>POST /api/predict/{id}</code>，14 场并行，
-      每场回来就写进它自己那格）。第一行是模型 prob 头的首选 + 概率，第二行是
-      <b>LLM 头</b>，第三行是 LLM 给的比分；
-      <b>两行方向不一致时 LLM 那行标黄</b> —— 「三头一致」才是验过有正收益的开口条件，
-      不一致的别当同一个信号看。λ 只在悬停提示里（GLOBAL 组在国家队场次不可信）。
-      ${gap ? ` · ${gap} 场竞彩当期未开售，体彩不给开球时间，只能显示日期` : ""}
-      ${hasFid ? " · 蓝色场次可点，直达「预测」页"
-               // 后端现在会先走竞彩关联、再走「日期窗 + 队名」兜底，两条都断了
-               // 才是这个名字问题 —— 「竞彩没开售」已经不再是解释（9-28 起）。
-               : " · id 显示「–」= 队名没认出来（补 teams.name_zh 或写 jc_overrides.json）"}
     </div>`;
 
   $$("a.jump", out).forEach(a => a.onclick = ev => {
