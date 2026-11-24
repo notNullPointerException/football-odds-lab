@@ -147,9 +147,9 @@ async function loadUser() {
     } else {
       document.getElementById("recharge-card").style.display = "block";
       if (!me.expires_at) {
-      expEl.textContent = "未开通";
-      expEl.style.color = "#8b93a5";
-    } else {
+        expEl.textContent = "未开通";
+        expEl.style.color = "#8b93a5";
+      } else {
       // 倒计时
       const exp = new Date(me.expires_at);
       function updateCountdown() {
