@@ -329,7 +329,7 @@
   <nav>
     <button data-tab="jc" class="on">体彩</button>
     <button data-tab="sfc">胜负14场</button>
-    <button data-tab="predict">预测</button>
+    <button data-tab="predict" id="tab-predict-btn" style="display:none;">预测</button>
     <button data-tab="history">历史预测</button>
     <button data-tab="admin" id="tab-admin-btn" hidden>管理</button>
     <button id="btn-user-center">个人中心</button>
@@ -366,7 +366,7 @@
       <span style="margin-left:auto"></span>
       <button class="act" id="sfc-run"
         >跑 14 场预测</button>
-      <button class="act" id="sfc-archive"
+      <button class="act" id="sfc-archive" style="display:none;"
         title="把本期 14 场 + 赛前预测快照存进库，开奖后在「历史」页的【分类=胜负14场】看复盘。打开本页时会自动存一次，这个按钮是手动补一炮">存档本期</button>
       <button class="act" id="sfc-refresh">刷新</button>
     </div>
@@ -2941,6 +2941,43 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
   }
   // also check periodically in case token changes
   setInterval(updateLogout, 2000);
+})();
+</script>
+
+
+<script>
+// admin 专属功能显示
+(async function(){
+  const token = localStorage.getItem("token");
+  if (!token) return;
+  try {
+    const r = await fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } });
+    if (!r.ok) return;
+    const me = await r.json();
+    if (me.role === "admin") {
+      const predictTab = document.getElementById("tab-predict-btn");
+      const archiveBtn = document.getElementById("sfc-archive");
+      if (predictTab) predictTab.style.display = "";
+      if (archiveBtn) archiveBtn.style.display = "";
+    }
+  } catch(e) {}
+})();
+
+// 跑 14 场预测频率限制（60秒内只能点一次）
+(function(){
+  const btn = document.getElementById("sfc-run");
+  if (!btn) return;
+  let lastRun = 0;
+  const orig = btn.onclick;
+  btn.onclick = function(e) {
+    const now = Date.now();
+    if (now - lastRun < 60000) {
+      alert("请等待 " + Math.ceil((60000 - (now - lastRun)) / 1000) + " 秒后再试");
+      return;
+    }
+    lastRun = now;
+    if (orig) orig.call(this, e);
+  };
 })();
 </script>
 
