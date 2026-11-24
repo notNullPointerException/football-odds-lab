@@ -28,19 +28,30 @@ def init():
     db.commit()
     print("Menus created")
     
-    # Role permissions
+    # Role permissions (idempotent: check before insert)
     # admin: all menus
     # user: jc, sfc, history (no predict, no admin)
-    # guest: jc, sfc, history
     all_menus = db.query(Menu).all()
     admin_codes = ["jc", "sfc", "predict", "history", "admin"]
     user_codes = ["jc", "sfc", "history"]
     
     for menu in all_menus:
         if menu.code in admin_codes:
-            db.execute(role_menus.insert().values(role="admin", menu_id=menu.id))
+            exists = db.execute(
+                role_menus.select().where(
+                    (role_menus.c.role == "admin") & (role_menus.c.menu_id == menu.id)
+                )
+            ).first()
+            if not exists:
+                db.execute(role_menus.insert().values(role="admin", menu_id=menu.id))
         if menu.code in user_codes:
-            db.execute(role_menus.insert().values(role="user", menu_id=menu.id))
+            exists = db.execute(
+                role_menus.select().where(
+                    (role_menus.c.role == "user") & (role_menus.c.menu_id == menu.id)
+                )
+            ).first()
+            if not exists:
+                db.execute(role_menus.insert().values(role="user", menu_id=menu.id))
     db.commit()
     print("Role permissions set")
     db.close()
