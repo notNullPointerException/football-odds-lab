@@ -3,7 +3,7 @@
 <head>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
 <title>登录 · AI Football</title>
 <link rel="preload" as="image" href="/login-bg.webp">
 <style>
@@ -12,10 +12,13 @@ body {
   font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  /* 原来是 align-items:center + overflow:hidden：卡片比手机屏高时，
+     上下多出来的部分会被直接裁掉且滚不动 —— 登录/注册按钮就点不到了。
+     改成 flex-start + 卡片 auto 外边距：装得下就居中，装不下就从顶部排、页面可滚。 */
+  align-items: flex-start;
   justify-content: center;
+  padding: 24px;
   background: #0a0c10;
-  overflow: hidden;
 }
 .bg {
   position: fixed; inset: 0;
@@ -32,6 +35,8 @@ body {
   position: relative;
   z-index: 1;
   width: 380px;
+  max-width: 100%;
+  margin: auto;
   background: rgba(18, 20, 26, 0.85);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,.08);
@@ -96,6 +101,37 @@ input:focus { border-color: #4a9eff; }
   cursor: pointer;
   background: #1e222b;
 }
+.pass-wrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+.pass-wrap input {
+  width: 100%;
+  margin-bottom: 0;
+  padding-right: 46px;   /* 给右侧的眼睛图标留位，避免文字被盖住 */
+}
+.eye {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  color: #8b93a5;
+  cursor: pointer;
+}
+.eye:hover { color: #e6e9ef; background: rgba(255,255,255,.08); }
+.eye svg { width: 20px; height: 20px; display: block; }
+.eye .eye-off { display: none; }
+.eye.on .eye-on { display: none; }
+.eye.on .eye-off { display: block; }
 .btn {
   width: 100%;
   padding: 12px;
@@ -123,6 +159,12 @@ input:focus { border-color: #4a9eff; }
   color: #8b93a5;
 }
 .hint a { color: #4a9eff; cursor: pointer; text-decoration: none; }
+@media (max-width: 480px) {
+  body { padding: 16px; }
+  .card { padding: 28px 20px; }
+  /* iOS 聚焦 <16px 的输入框会自动放大页面；按手机规格提到 16px */
+  input { font-size: 16px; }
+}
 </style>
 </head>
 <body>
@@ -144,10 +186,23 @@ input:focus { border-color: #4a9eff; }
 
   <!-- 登录 -->
   <div id="panel-login">
-    <input id="login-user" placeholder="用户名" maxlength="8">
-    <input id="login-pass" type="password" placeholder="密码" maxlength="12">
+    <!-- 手机键盘防护：iOS/微信会自动把首字母大写、联想改写，
+         中文输入法还可能打出全角 ［ ／ 首尾空格 —— 用户看不到，只会得到 401。
+         autocapitalize/autocorrect 关掉这些；密码框内放一个眼睛图标便于自己核对。 -->
+    <input id="login-user" placeholder="用户名" maxlength="8"
+           autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <div class="pass-wrap">
+      <input id="login-pass" type="password" placeholder="密码" maxlength="12"
+             autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <button type="button" class="eye" id="toggle-login-pass" aria-label="显示密码" title="显示密码"
+              aria-pressed="false">
+        <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
+    </div>
     <div class="captcha-row">
-      <input id="login-captcha" placeholder="验证码">
+      <input id="login-captcha" placeholder="验证码"
+             autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
       <img id="login-captcha-img" title="点击刷新">
     </div>
     <button class="btn" id="btn-login">登录</button>
@@ -156,11 +211,29 @@ input:focus { border-color: #4a9eff; }
 
   <!-- 注册 -->
   <div id="panel-register" style="display:none">
-    <input id="reg-user" placeholder="用户名（最长8位）" maxlength="8">
-    <input id="reg-pass" type="password" placeholder="密码（最长12位）" maxlength="12">
-    <input id="reg-pass2" type="password" placeholder="确认密码" maxlength="12">
+    <input id="reg-user" placeholder="用户名（最长8位）" maxlength="8"
+           autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <div class="pass-wrap">
+      <input id="reg-pass" type="password" placeholder="密码（最长12位）" maxlength="12"
+             autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <button type="button" class="eye" id="toggle-reg-pass" aria-label="显示密码" title="显示密码"
+              aria-pressed="false">
+        <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
+    </div>
+    <div class="pass-wrap">
+      <input id="reg-pass2" type="password" placeholder="确认密码" maxlength="12"
+             autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <button type="button" class="eye" id="toggle-reg-pass2" aria-label="显示密码" title="显示密码"
+              aria-pressed="false">
+        <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
+    </div>
     <div class="captcha-row">
-      <input id="reg-captcha" placeholder="验证码">
+      <input id="reg-captcha" placeholder="验证码"
+             autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
       <img id="reg-captcha-img" title="点击刷新">
     </div>
     <button class="btn" id="btn-register">注册</button>
@@ -211,13 +284,63 @@ async function loadLoginCaptcha() {
 $("#login-captcha-img")?.addEventListener("click", loadLoginCaptcha);
 loadLoginCaptcha();
 
+// 手机输入法归一化。中文键盘容易把 [ 打成 ［、句末补空格、联想改字，
+// 密码框里全是圆点，用户看不见，只会拿到「用户名或密码错误」。
+// 用户名/验证码直接转半角；密码不静默改，检测到就提示重输。
+const halfWidth = s => s
+  .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+  .replace(/　/g, " ");
+const passwordNeedsRetry = p => p !== p.trim() || /[！-～　]/.test(p);
+
+// 剪贴板/输入法偶尔带进零宽字符（U+200B、U+FEFF 等）或控制符，密码框里也是圆点，
+// 肉眼看不出来，服务端只会回「用户名或密码错误」→ 提交前直接剔掉。
+const stripInvisible = s => s.replace(/[\u0000-\u001F\u007F\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "");
+
+// 粘贴时整段替换输入框内容。手机密码框可能被系统自动填充占满 12 位（maxlength=12），
+// 这时光标在末尾粘贴等于没反应，用户却以为已经换成自己复制的密码了。
+function bindPasteReplace(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("paste", ev => {
+    const t = (ev.clipboardData || window.clipboardData)?.getData("text");
+    if (t == null) return;
+    ev.preventDefault();
+    el.value = t;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+["login-user", "login-pass", "reg-user", "reg-pass", "reg-pass2"].forEach(bindPasteReplace);
+
+// 密码框的眼睛图标：登录 + 注册两个密码框共用一套逻辑。
+// 图标状态由 .on 控制（CSS 切换睁眼/闭眼），title/aria 只做无障碍提示。
+function bindPassToggle(inputId, btnId) {
+  const inp = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  if (!inp || !btn) return;
+  btn.addEventListener("click", () => {
+    const show = inp.type === "password";
+    inp.type = show ? "text" : "password";
+    btn.classList.toggle("on", show);
+    btn.title = show ? "隐藏密码" : "显示密码";
+    btn.setAttribute("aria-label", btn.title);
+    btn.setAttribute("aria-pressed", String(show));
+  });
+}
+bindPassToggle("login-pass", "toggle-login-pass");
+bindPassToggle("reg-pass", "toggle-reg-pass");
+bindPassToggle("reg-pass2", "toggle-reg-pass2");
+
 $("#btn-login").onclick = async () => {
-  const u = $("#login-user").value.trim();
-  const p = $("#login-pass").value;
-  const ccode = $("#login-captcha")?.value.trim() || "";
+  const u = stripInvisible(halfWidth($("#login-user").value)).trim();
+  const p = stripInvisible($("#login-pass").value);
+  const ccode = halfWidth($("#login-captcha")?.value || "").trim();
   const cid = $("#login-captcha-img")?.dataset.cid || "";
   const msg = $("#login-msg");
   if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
+  if (passwordNeedsRetry(p)) {
+    msg.textContent = "密码里有全角字符或首尾空格（手机输入法常见），点密码框右侧的眼睛核对后重输";
+    return;
+  }
   if (!ccode) { msg.textContent = "请输入验证码"; return; }
   const r = await fetch("/api/auth/login", {
     method: "POST",
@@ -229,7 +352,16 @@ $("#btn-login").onclick = async () => {
     localStorage.setItem("token", d.token);
     location.href = "/";
   } else {
-    msg.textContent = d.detail || "登录失败"; 
+    // 401 时把「实际发出去的东西」亮出来：用户名原样回显；密码只报长度和首尾字符
+    // （粘贴常丢开头/结尾各一位，肉眼看圆点看不出来）。内容本身不回显，要看点眼睛。
+    let diag = "";
+    if (r.status === 401) {
+      const odd = [...p].filter(c => c.codePointAt(0) > 126 || c.codePointAt(0) < 32).length;
+      const first = p ? JSON.stringify(p[0]) : '""';
+      const last = p ? JSON.stringify(p[p.length - 1]) : '""';
+      diag = `（用户名：${u}；密码 ${p.length} 位，首字符 ${first}，尾字符 ${last}${odd ? `，含 ${odd} 个非 ASCII` : ""}）`;
+    }
+    msg.textContent = (d.detail || "登录失败") + diag;
     document.getElementById("login-captcha").value = "";
     loadLoginCaptcha();
   }
@@ -237,13 +369,17 @@ $("#btn-login").onclick = async () => {
 
 // register
 $("#btn-register").onclick = async () => {
-  const u = $("#reg-user").value.trim();
-  const p = $("#reg-pass").value;
-  const p2 = $("#reg-pass2").value;
-  const ccode = $("#reg-captcha").value.trim();
+  const u = stripInvisible(halfWidth($("#reg-user").value)).trim();
+  const p = stripInvisible($("#reg-pass").value);
+  const p2 = stripInvisible($("#reg-pass2").value);
+  const ccode = halfWidth($("#reg-captcha").value).trim();
   const cid = $("#reg-captcha-img").dataset.cid || "";
   const msg = $("#reg-msg");
   if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
+  if (passwordNeedsRetry(p)) {
+    msg.textContent = "密码里有全角字符或首尾空格，请切英文键盘重输（全角会被存成别的字符）";
+    return;
+  }
   if (u.length > 8) { msg.textContent = "用户名最长8位"; return; }
   if (p.length < 6) { msg.textContent = "密码至少6位"; return; }
   if (p.length > 12) { msg.textContent = "密码最长12位"; return; }

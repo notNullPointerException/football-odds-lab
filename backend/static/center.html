@@ -3,7 +3,7 @@
 <head>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
 <title>个人中心 · AI Football</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -94,6 +94,13 @@ select {
 
 
 .back { color: #4a9eff; cursor: pointer; }
+@media (max-width: 480px) {
+  .header { padding: 12px 16px; gap: 10px; }
+  .container { margin: 24px auto; padding: 0 14px; }
+  .card { padding: 18px; }
+  /* iOS 聚焦 <16px 的控件会自动放大页面；按手机规格提到 16px */
+  select, button { font-size: 16px; }
+}
 </style>
 </head>
 <body>
@@ -133,10 +140,10 @@ const $ = s => document.querySelector(s);
 
 async function loadUser() {
   const token = localStorage.getItem("token");
-  if (!token) { location.href = "/login.html"; return; }
+  if (!token) { location.href = "/login.html?v=4"; return; }
   try {
     const r = await fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } });
-    if (!r.ok) { location.href = "/login.html"; return; }
+    if (!r.ok) { location.href = "/login.html?v=4"; return; }
     const me = await r.json();
     $("#uc-username").textContent = me.username || "-";
     $("#uc-role").textContent = me.role || "-";
@@ -170,7 +177,7 @@ async function loadUser() {
       }
     }
   } catch(e) {
-    location.href = "/login.html";
+    location.href = "/login.html?v=4";
   }
 }
 
@@ -245,7 +252,7 @@ $("#btn-recharge").onclick = () => {
       });
       if (r.status === 401) {
         localStorage.removeItem("token");
-        location.href = "/login.html";
+        location.href = "/login.html?v=4";
       }
     } catch (e) {}
   }, 10 * 60 * 1000);
