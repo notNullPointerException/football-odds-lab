@@ -309,7 +309,9 @@
   const origFetch = window.fetch;
   window.fetch = async function(...args) {
     const res = await origFetch.apply(this, args);
-    if (res.status === 401 && location.pathname !== LOGIN) {
+    // 只在 auth 接口 401 时跳转，预测等接口由各自处理
+    const url = args[0] || "";
+    if (res.status === 401 && location.pathname !== LOGIN && String(url).includes("/api/auth/")) {
       localStorage.removeItem("token");
       location.href = LOGIN;
     }
