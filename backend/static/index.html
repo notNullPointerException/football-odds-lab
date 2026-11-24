@@ -1587,6 +1587,11 @@ $("#sfc-archive").onclick = async () => {
 /* 跑单场，返回 true=成功。批量和格子上的「重跑」共用这一条路径 ——
    两处各写一遍 normalizePredict + 「刚刚」时间戳迟早会改漏一处。 */
 async function runOneSfcPredict(fid) {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    alert("请先登录后再进行预测");
+    return false;
+  }
   const at = "跑于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
   try {
     const res = await api(`/api/predict/${fid}`, { method: "POST" });
