@@ -2926,5 +2926,37 @@ document.getElementById("adm-users")?.addEventListener("click", async ev => {
   }
 });
 </script>
+
+<script>
+// 动态加载菜单
+(async function loadMenus() {
+  const nav = document.querySelector("nav");
+  if (!nav) return;
+  try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: "Bearer " + token } : {};
+    const r = await fetch("/api/auth/menus", { headers });
+    if (!r.ok) return;
+    const menus = await r.json();
+    // Clear existing menu buttons (keep personal center)
+    const center = document.getElementById("btn-user-center");
+    nav.querySelectorAll("button[data-tab]").forEach(b => b.remove());
+    // Add menus from API
+    menus.forEach(m => {
+      const btn = document.createElement("button");
+      btn.dataset.tab = m.code;
+      btn.textContent = m.name;
+      if (m.code === "jc") btn.classList.add("on");
+      if (center) nav.insertBefore(btn, center);
+      else nav.appendChild(btn);
+    });
+    // Rebind click handlers
+    nav.querySelectorAll("button[data-tab]").forEach(b => {
+      b.onclick = () => switchTab(b.dataset.tab);
+    });
+  } catch(e) { console.error("load menus failed", e); }
+})();
+</script>
+
 </body>
 </html>
