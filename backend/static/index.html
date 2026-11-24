@@ -2218,7 +2218,7 @@ window.checkAuth = async function checkAuth() {
   return null;
 }
 function requireLogin() {
-  document.getElementById("login-modal").style.display = "flex";
+  location.href = "/login.html";
   return false;
 }
 function showPayModal() {
