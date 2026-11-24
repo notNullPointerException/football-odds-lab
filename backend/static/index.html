@@ -2626,28 +2626,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
   location.href = "/center.html";
   return;
 });
-// old modal code below (disabled)
-  async function _old() {
-  const modal = document.getElementById("user-center-modal");
-  if (!modal) return alert("个人中心组件未加载");
-  modal.style.display = "flex";
-  modal.style.zIndex = "9999";
-  let me = null;
-  try {
-    const fn = window.checkAuth;
-    if (typeof fn === "function") me = await fn();
-  } catch(e) { console.error(e); }
-  if (me) {
-    document.getElementById("uc-guest").style.display = "none";
-    document.getElementById("uc-logged").style.display = "block";
-    document.getElementById("uc-username").textContent = me.username || "";
-    document.getElementById("uc-role").textContent = me.role || "";
-    document.getElementById("uc-expires").textContent = me.expires_at ? String(me.expires_at).slice(0,10) : "未开通";
-  } else {
-    document.getElementById("uc-guest").style.display = "block";
-    document.getElementById("uc-logged").style.display = "none";
-  }
-});
+
 </script>
 
 
