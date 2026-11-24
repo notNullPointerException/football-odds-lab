@@ -359,6 +359,10 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    if not hit(f"login:ip:{client_ip(request)}", 10, 300):
+        raise HTTPException(429, "登录尝试过多，请5分钟后再试")
+    if not hit(f"login:user:{body.username}", 5, 300):
+        raise HTTPException(429, "该账号登录失败次数过多，请5分钟后再试")
     # 防密码爆破：按来源 IP 和按被打的用户名各一个桶
     ip = client_ip(request)
     if not hit(f"login:ip:{ip}", 20, 300) or not hit(f"login:user:{body.username}", 10, 300):
@@ -513,3 +517,21 @@ def recharge_ticker(db: Session = Depends(get_db)):
         }
         for r in rows
     ]
+
+
+@router.get("/menus")
+def get_menus(
+    db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user),
+):
+    """Get menus for current user based on role. Guest gets user menus."""
+    from app.models.menu import Menu, role_menus
+    role = user.role if user else "user"
+    # Guest and non-member get basic menus
+    if not user:
+        role = "user"
+    menus = db.query(Menu).join(role_menus).filter(
+        role_menus.c.role == role,
+        Menu.is_active == True
+    ).order_by(Menu.sort_order).all()
+    return [{"code": m.code, "name": m.name} for m in menus]

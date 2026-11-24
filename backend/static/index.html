@@ -331,7 +331,7 @@
     <button data-tab="sfc">胜负14场</button>
     <button data-tab="predict" id="tab-predict-btn" style="display:none;">预测比赛</button>
     <button data-tab="history">历史预测</button>
-    <button data-tab="admin" id="tab-admin-btn" hidden>管理</button>
+    <!-- admin button added dynamically for admin role -->
     <button id="btn-user-center">个人中心</button>
   </nav>
   <span class="hint" id="net" style="display:none"></span>
@@ -739,7 +739,11 @@ function switchTab(name) {
   if (name === "jc" && !jc.loaded) loadJc(false);
   if (name === "sfc" && !sfc.loaded) loadSfc(false);
   if (name === "history" && !state.loaded) loadHistory(1);
-  if (name === "admin" && window.loadAdminUsers) window.loadAdminUsers();
+  if (name === "admin") {
+    const token = localStorage.getItem("token");
+    if (!token) { switchTab("jc"); return; }
+    if (window.loadAdminUsers) window.loadAdminUsers();
+  }
 }
 $$("nav button").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
 
@@ -2237,8 +2241,21 @@ window.ensureMember = async function ensureMember() {
 window.refreshAdminEntry = async function refreshAdminEntry() {
   let me = null;
   try { me = await window.checkAuth(); } catch (e) {}
-  const btn = document.getElementById("tab-admin-btn");
-  if (btn) btn.hidden = !(me && me.role === "admin");
+  const nav = document.querySelector("nav");
+  let btn = document.getElementById("tab-admin-btn");
+  if (me && me.role === "admin") {
+    if (!btn && nav) {
+      btn = document.createElement("button");
+      btn.id = "tab-admin-btn";
+      btn.dataset.tab = "admin";
+      btn.textContent = "管理";
+      const center = document.getElementById("btn-user-center");
+      if (center) nav.insertBefore(btn, center);
+      else nav.appendChild(btn);
+    }
+  } else if (btn) {
+    btn.remove();
+  }
   return me;
 };
 
@@ -2260,7 +2277,7 @@ window.loadAdminUsers = async function loadAdminUsers() {
         : `<span style="color:var(--dim2)">非会员</span>`;
       const action = u.role === "admin"
         ? `<span class="hint">–</span>`
-        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button>`;
+        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button> <button class="ghost" data-reset="${u.id}" data-name="${esc(u.username)}">重置密码</button>`;
       return `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.role)}</td>` +
         `<td>${u.is_active ? "正常" : `<span style="color:var(--bad)">已禁用</span>`}</td>` +
         `<td>${member}</td><td>${exp}</td><td>${action}</td></tr>`;
@@ -2892,5 +2909,54 @@ document.addEventListener("click", function(e) {
   }
 });
 </script>
+<script>
+document.getElementById("adm-users")?.addEventListener("click", async ev => {
+  const resetBtn = ev.target.closest("[data-reset]");
+  if (resetBtn) {
+    const id = resetBtn.dataset.reset;
+    const name = resetBtn.dataset.name;
+    if (!confirm(`确定重置用户 ${name} 的密码？`)) return;
+    try {
+      const res = await api(`/api/auth/admin/users/${id}/reset-password`, { method: "POST" });
+      alert(`密码已重置为：${res.body.password}`);
+    } catch(e) {
+      alert("重置失败：" + (e.message || e));
+    }
+    return;
+  }
+});
+</script>
+
+<script>
+// 动态加载菜单
+(async function loadMenus() {
+  const nav = document.querySelector("nav");
+  if (!nav) return;
+  try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: "Bearer " + token } : {};
+    const r = await fetch("/api/auth/menus", { headers });
+    if (!r.ok) return;
+    const menus = await r.json();
+    // Clear existing menu buttons (keep personal center)
+    const center = document.getElementById("btn-user-center");
+    nav.querySelectorAll("button[data-tab]").forEach(b => b.remove());
+    // Add menus from API
+    menus.forEach(m => {
+      const btn = document.createElement("button");
+      btn.dataset.tab = m.code;
+      btn.textContent = m.name;
+      if (m.code === "jc") btn.classList.add("on");
+      if (center) nav.insertBefore(btn, center);
+      else nav.appendChild(btn);
+    });
+    // Rebind click handlers
+    nav.querySelectorAll("button[data-tab]").forEach(b => {
+      b.onclick = () => switchTab(b.dataset.tab);
+    });
+  } catch(e) { console.error("load menus failed", e); }
+})();
+</script>
+
 </body>
 </html>
