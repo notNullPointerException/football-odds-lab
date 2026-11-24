@@ -3021,7 +3021,7 @@ document.addEventListener("click", async function(e) {
   
   // 禁用按钮，显示加载中
   btn.disabled = true;
-  btn.textContent = "预测中...";
+  btn.innerHTML = '<span class="spin"></span>';
   
   try {
     const res = await fetch(`/api/predict/${fid}`, {
@@ -3039,14 +3039,19 @@ document.addEventListener("click", async function(e) {
     // 预测完成，显示详情按钮
     btn.textContent = "预测比赛";
     btn.disabled = false;
+    // 跳转到预测页显示结果
+    switchTab("predict");
+    renderPredictResult(data);
     // 在按钮后面添加详情按钮
     let detailBtn = btn.nextElementSibling;
     if (!detailBtn || !detailBtn.classList.contains("jc-detail")) {
       detailBtn = document.createElement("button");
-      detailBtn.className = "ghost small jc-detail";
-      detailBtn.textContent = "详情";
+      detailBtn.className = "act small jc-detail";
+      detailBtn.style.background = "#f87171";
+      detailBtn.style.marginLeft = "4px";
+      detailBtn.textContent = "预测详情";
       detailBtn.dataset.fid = fid;
-      detailBtn.onclick = () => showPredictDetail(fid, data);
+      detailBtn.onclick = () => { switchTab("predict"); renderPredictResult(data); };
       btn.parentNode.insertBefore(detailBtn, btn.nextSibling);
     }
     showModal("预测完成");
