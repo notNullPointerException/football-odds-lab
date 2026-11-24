@@ -270,15 +270,8 @@
   document.addEventListener("DOMContentLoaded", () => {
     const icon = document.getElementById("btn-user-icon");
     if (icon) {
-      icon.onclick = async () => {
-        const me = window.checkAuth ? await window.checkAuth() : null;
-        if (me) {
-          // 已登录，打开个人中心
-          const m = document.getElementById("user-center-modal");
-          if (m) m.style.display = "flex";
-        } else {
-          location.href = "/login.html";
-        }
+      icon.onclick = () => {
+        location.href = "/login.html";
       };
     }
     // 个人中心里的登录按钮也跳独立页
@@ -2473,7 +2466,8 @@ setInterval(loadTicker, 5 * 60 * 1000);
 document.getElementById("btn-user-center")?.addEventListener("click", () => {
   location.href = "/center.html";
   return;
-  // old modal code below (disabled)
+});
+// old modal code below (disabled)
   async function _old() {
   const modal = document.getElementById("user-center-modal");
   if (!modal) { alert("个人中心组件未找到"); return; }
@@ -2710,7 +2704,8 @@ document.getElementById("dd-logout")?.addEventListener("click", () => {
 document.getElementById("btn-user-center")?.addEventListener("click", () => {
   location.href = "/center.html";
   return;
-  // old modal code below (disabled)
+});
+// old modal code below (disabled)
   async function _old() {
   const modal = document.getElementById("user-center-modal");
   if (!modal) return alert("个人中心组件未加载");
