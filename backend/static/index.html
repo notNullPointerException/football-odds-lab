@@ -3072,7 +3072,7 @@ async function doPredict(btn, fid, token) {
       detailBtn.style.display = "inline-block";
       detailBtn.textContent = "预测详情";
       detailBtn.dataset.fid = fid;
-      detailBtn.onclick = () => { window.open("/predict.html?fid=" + fid, "_blank"); };
+      detailBtn.onclick = () => { loadIntoPredict(parseInt(fid, 10)); };
       btn.parentNode.insertBefore(detailBtn, btn.nextSibling);
     }
     showModal("预测完成");
