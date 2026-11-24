@@ -739,7 +739,11 @@ function switchTab(name) {
   if (name === "jc" && !jc.loaded) loadJc(false);
   if (name === "sfc" && !sfc.loaded) loadSfc(false);
   if (name === "history" && !state.loaded) loadHistory(1);
-  if (name === "admin" && window.loadAdminUsers) window.loadAdminUsers();
+  if (name === "admin") {
+    const token = localStorage.getItem("token");
+    if (!token) { switchTab("jc"); return; }
+    if (window.loadAdminUsers) window.loadAdminUsers();
+  }
 }
 $$("nav button").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
 
