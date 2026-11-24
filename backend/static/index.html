@@ -2238,26 +2238,7 @@ window.ensureMember = async function ensureMember() {
 };
 
 /* ---------------- 管理页（仅 admin 可见，后端也强制 require_admin） ---------------- */
-window.refreshAdminEntry = async function refreshAdminEntry() {
-  let me = null;
-  try { me = await window.checkAuth(); } catch (e) {}
-  const nav = document.querySelector("nav");
-  let btn = document.getElementById("tab-admin-btn");
-  if (me && me.role === "admin") {
-    if (!btn && nav) {
-      btn = document.createElement("button");
-      btn.id = "tab-admin-btn";
-      btn.dataset.tab = "admin";
-      btn.textContent = "管理";
-      const center = document.getElementById("btn-user-center");
-      if (center) nav.insertBefore(btn, center);
-      else nav.appendChild(btn);
-    }
-  } else if (btn) {
-    btn.remove();
-  }
-  return me;
-};
+// refreshAdminEntry removed - menus now loaded from database
 
 window.loadAdminUsers = async function loadAdminUsers() {
   const tb = document.getElementById("adm-users");
@@ -2316,7 +2297,7 @@ document.getElementById("adm-users")?.addEventListener("click", async ev => {
     alert("操作失败：" + (e.detail || e.message));
   }
 });
-window.refreshAdminEntry();
+// window.refreshAdminEntry(); // removed
 document.getElementById("btn-close-pay")?.addEventListener("click", () => {
   document.getElementById("pay-modal").style.display = "none";
 });
