@@ -331,7 +331,7 @@
     <button data-tab="sfc">胜负14场</button>
     <button data-tab="predict" id="tab-predict-btn" style="display:none;">预测比赛</button>
     <button data-tab="history">历史预测</button>
-    <button data-tab="admin" id="tab-admin-btn" hidden>管理</button>
+    <!-- admin button added dynamically for admin role -->
     <button id="btn-user-center">个人中心</button>
   </nav>
   <span class="hint" id="net" style="display:none"></span>
@@ -2237,8 +2237,21 @@ window.ensureMember = async function ensureMember() {
 window.refreshAdminEntry = async function refreshAdminEntry() {
   let me = null;
   try { me = await window.checkAuth(); } catch (e) {}
-  const btn = document.getElementById("tab-admin-btn");
-  if (btn) btn.hidden = !(me && me.role === "admin");
+  const nav = document.querySelector("nav");
+  let btn = document.getElementById("tab-admin-btn");
+  if (me && me.role === "admin") {
+    if (!btn && nav) {
+      btn = document.createElement("button");
+      btn.id = "tab-admin-btn";
+      btn.dataset.tab = "admin";
+      btn.textContent = "管理";
+      const center = document.getElementById("btn-user-center");
+      if (center) nav.insertBefore(btn, center);
+      else nav.appendChild(btn);
+    }
+  } else if (btn) {
+    btn.remove();
+  }
   return me;
 };
 
