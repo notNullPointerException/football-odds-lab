@@ -205,6 +205,39 @@
     margin-top:12px;background:rgba(255,95,109,.08);border:1px solid rgba(255,95,109,.35);
     color:#ffb3b9;border-radius:9px;padding:12px 14px;font-size:13px;white-space:pre-wrap;
   }
+  /* ---- 预测页 / 胜负彩页的能力介绍 ----
+     面向游客说明「这套东西是怎么算出来的」，会员登录后由 refreshUserIcon 收起 CTA。
+     文案只写代码里真实存在的东西（78 维特征、XGB+双泊松+LLM、赛前存档），不写命中率。 */
+  .hero{
+    position:relative;overflow:hidden;margin-bottom:14px;padding:22px 24px;
+    background:
+      radial-gradient(600px 220px at 88% -30%,rgba(74,158,255,.16),transparent 70%),
+      linear-gradient(135deg,rgba(74,158,255,.08),rgba(23,26,33,.35) 55%,var(--panel));
+    border:1px solid var(--line);border-radius:14px;
+  }
+  .hero-k{font-size:10px;font-weight:700;letter-spacing:2.2px;color:var(--acc);text-transform:uppercase}
+  .hero h2{margin:8px 0;font-size:20px;line-height:1.35;font-weight:600;letter-spacing:.2px}
+  .hero .lead{margin:0;max-width:900px;color:var(--dim);font-size:13px;line-height:1.8}
+  .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:18px}
+  .pipeline .step{background:rgba(15,17,21,.55);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+  .pipeline .step .n{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:10px;color:var(--acc);letter-spacing:.8px;
+  }
+  .pipeline .step b{display:block;margin:3px 0 4px;font-size:13px;font-weight:600}
+  .pipeline .step em{display:block;font-style:normal;color:var(--dim2);font-size:11.5px;line-height:1.65}
+  .hero-cta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+  .hero-cta .txt{color:var(--dim);font-size:12.5px}
+  .hero-cta .go{
+    margin-left:auto;display:inline-block;background:var(--acc);border:1px solid var(--acc);
+    color:#04121f;font-size:13px;font-weight:700;padding:8px 18px;border-radius:8px;text-decoration:none;
+  }
+  .hero-cta .go:hover{filter:brightness(1.1)}
+  @media(max-width:640px){
+    .hero{padding:18px}
+    .hero h2{font-size:17px}
+    .hero-cta .go{margin-left:0;width:100%;text-align:center}
+  }
   /* 隧道/网关瞬断时的兜底页：盖住整页，探测 /api/health，恢复后自动刷新 */
   #tunnel-fallback{
     display:none;position:fixed;inset:0;z-index:300;
@@ -342,6 +375,26 @@
 })();
 </script>
 
+<script>
+// ── 页面心跳保活：页面开着就算在线 ──
+// 分析比赛可能一盯就是几十分钟，人不点按钮但页面还在用。后端 token 是
+// 30 分钟「空闲」超时（滑动续期），这里每 10 分钟带 token 打一次
+// /api/auth/me，中间件就会把 TTL 续回 30 分钟。
+// 不判 document.hidden：切到别的窗口、看别的标签页也算「页面开着」。
+// 没登录（无 token）不发；页面关掉后定时器自然停止。
+(function () {
+  if (!localStorage.getItem("token")) return;
+  setInterval(function () {
+    var tok = localStorage.getItem("token");
+    if (!tok) return;
+    fetch("/api/auth/me", {
+      headers: { Authorization: "Bearer " + tok },
+      cache: "no-store"
+    }).catch(function () {});
+  }, 10 * 60 * 1000);
+})();
+</script>
+
 </head>
 <body>
 
@@ -370,6 +423,33 @@
 <main>
   
   <section id="tab-jc">
+    <div class="hero">
+      <div class="hero-k">JC Matchday Desk</div>
+      <h2>单场竞彩：独立建模、双轨定价、赛后归因</h2>
+      <p class="lead">竞彩的难点不在单场强弱，而在于同一晚多场在售比赛中的场次筛选。模型对每场分别给出胜平负、让球与大小球概率，再把体彩官方去水盘、庄家锐盘与模型首选并排放；让球线单独建模，不并进胜平负混算。预测在停售前锁定，赛果出来后逐场回看。</p>
+      <div class="pipeline">
+        <div class="step">
+          <div class="n">01 / BOARD</div><b>在售盘面</b>
+          <em>按停售时间与联赛排列，早停售、编号与让球线先行呈现，避免筛选后才错过截止。</em>
+        </div>
+        <div class="step">
+          <div class="n">02 / MODEL</div><b>逐场建模</b>
+          <em>XGBoost 出胜平负 / 大小球，泊松刻画净胜球与让球线，大模型补阵容与战意。</em>
+        </div>
+        <div class="step">
+          <div class="n">03 / ANCHOR</div><b>盘口锚定</b>
+          <em>体彩去水概率、庄家锐盘与模型首选三方并排，水位差和背离逐项标注。</em>
+        </div>
+        <div class="step">
+          <div class="n">04 / AUDIT</div><b>赛果回看</b>
+          <em>停售前存档，赛后按赛果、让球结果与冷门分布回看，区分模型偏差与市场冷门。</em>
+        </div>
+      </div>
+      <div class="hero-cta" data-hero-cta>
+        <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
+        <a class="go" data-hero-cta-link href="/login.html#register">注册 / 开通会员</a>
+      </div>
+    </div>
     <div class="bar">
       <span class="hint" id="jc-meta">加载中 …</span>
       <span style="margin-left:auto"></span>
@@ -382,6 +462,33 @@
 
   
   <section id="tab-sfc" hidden>
+    <div class="hero">
+      <div class="hero-k">14-Match Pool Stack</div>
+      <h2>一期 14 场，逐场建模，整期复盘</h2>
+      <p class="lead">胜负彩不是 14 个孤立的单选。同一期内的强弱差、平局概率与赛程密度会共同影响票面。引擎以同一套特征口径逐场给出胜平负概率，并把体彩官方盘与庄家去水盘并排对照；预测在赛前锁定存档，开奖后按模型头、市场侧与冷门分布逐期回看。</p>
+      <div class="pipeline">
+        <div class="step">
+          <div class="n">01 / SCAN</div><b>全期统一口径</b>
+          <em>14 场共用同一套特征与校准，避免跨联赛、跨期口径漂移。</em>
+        </div>
+        <div class="step">
+          <div class="n">02 / PRICE</div><b>双轨定价</b>
+          <em>体彩官方盘与庄家去水盘并排，水位差单独标注，不混成一条概率。</em>
+        </div>
+        <div class="step">
+          <div class="n">03 / SNAPSHOT</div><b>赛前快照</b>
+          <em>预测与赔率锁定在开赛前，赛后不可回改，复盘才有意义。</em>
+        </div>
+        <div class="step">
+          <div class="n">04 / REVIEW</div><b>开奖复盘</b>
+          <em>按模型头、市场命中与冷门分布逐期回看，区分实力与运气。</em>
+        </div>
+      </div>
+      <div class="hero-cta" data-hero-cta>
+        <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
+        <a class="go" data-hero-cta-link href="/login.html#register">注册 / 开通会员</a>
+      </div>
+    </div>
     <div class="bar">
       <span class="hint" id="sfc-meta">加载中 …</span>
       <span style="margin-left:auto"></span>
@@ -403,6 +510,33 @@
 
   
   <section id="tab-predict" hidden>
+    <div class="hero">
+      <div class="hero-k">Match Prediction Stack</div>
+      <h2>一场比赛，三层模型交叉验证</h2>
+      <p class="lead">把球队近 5 / 10 场攻防、主客场分化、联赛排名，与伤停名单、确认首发、机构赔率去水放进同一套特征工程。XGBoost 给出胜平负与大小球概率，双泊松刻画比分分布，大模型把阵容与战意翻译成可读结论；三层结果并列展示，分歧不隐藏。</p>
+      <div class="pipeline">
+        <div class="step">
+          <div class="n">01 / FEATURES</div><b>特征工程</b>
+          <em>78 维球队状态、攻防效率、主客场分化与排名差，统一口径。</em>
+        </div>
+        <div class="step">
+          <div class="n">02 / PROBABILITY</div><b>概率与比分</b>
+          <em>XGBoost 胜平负 / 大小球概率；双泊松输出最可能 Top3 比分。</em>
+        </div>
+        <div class="step">
+          <div class="n">03 / CONTEXT</div><b>阵容与动机</b>
+          <em>伤停、首发、赛程密度与战意，由大模型结构化解读。</em>
+        </div>
+        <div class="step">
+          <div class="n">04 / CROSS-CHECK</div><b>模型 / 市场对照</b>
+          <em>模型首选、大模型方向与赔率去水概率并列，分歧单独标记。</em>
+        </div>
+      </div>
+      <div class="hero-cta" data-hero-cta>
+        <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
+        <a class="go" data-hero-cta-link href="/login.html#register">注册 / 开通会员</a>
+      </div>
+    </div>
     <div class="bar">
       <label for="fid">比赛 ID</label>
       <input id="fid" type="number" placeholder="输入 fixture_id" autocomplete="off">
@@ -860,10 +994,6 @@ function switchTab(name) {
   $("#tab-predict").hidden = name !== "predict";
   $("#tab-history").hidden = name !== "history";
   $("#tab-admin").hidden   = name !== "admin";
-  if (name === "predict") {
-    const out = document.getElementById("predict-out");
-    if (out && !out.dataset.keep) out.innerHTML = '<div class="empty">输入比赛 ID 或从体彩/胜负14场页点击「预测比赛」</div>';
-  }
   if (name === "jc" && !jc.loaded) loadJc(false);
   if (name === "sfc" && !sfc.loaded) loadSfc(false);
   if (name === "history" && !state.loaded) loadHistory(1);
@@ -1783,13 +1913,14 @@ async function runSfcPredict() {
     return;
   }
   // 先弹窗提示
-  showModal(`胜负14场 AI 批量预测引擎启动\n\n正在调用 XGBoost 集成学习模型对 14 场比赛进行并行特征工程，结合 Poisson 回归计算各场进球期望，同步拉取球员伤停名单、近期赛程密度、主客场攻防数据等核心指标。\n\n多模型融合推理中，预计耗时 3～5 分钟，请耐心等待...`, {
+  showModal(`AI 分析引擎启动中\n\n14 场并行分析，单场约 30–60 秒，请耐心等待…`, {
     onOk: () => doSfcPredict()
   });
   return;
 }
 
 async function doSfcPredict() {
+  if (sfc.running) return;   // 弹窗「确定」被连点时，只真正跑一批
   const ms = (sfc.payload && sfc.payload.matches) || [];
   const fids = ms.map(m => m.fixture_id).filter(Boolean);
   if (!fids.length) return;
@@ -1992,11 +2123,13 @@ async function loadHistory(page) {
     renderPager(pages);
   } catch (e) {
     if (seq !== historySeq) return;
-    // 预测记录是会员内容：401=没登录、403=没开会员，给引导而不是红字报错
+    // 401=没登录（历史现在要求登录，免费注册即可看）；403=没会员（如后续收紧）
     if (e.status === 401) {
-      out.innerHTML = `<div class="empty">暂无历史记录</div>`;
+      out.innerHTML = `<div class="empty">登录后可查看预测记录<br>
+        <a href="/login.html">去登录</a> · <a href="/login.html#register">免费注册</a></div>`;
     } else if (e.status === 403) {
-      out.innerHTML = `<div class="empty">开通会员后可查看预测记录</div>`;
+      out.innerHTML = `<div class="empty">开通会员后可查看预测记录<br>
+        <a href="/center.html">去个人中心开通</a></div>`;
     } else {
       out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
     }
@@ -2065,7 +2198,12 @@ async function loadSfcHistory(seq) {
     renderPager(pages);
   } catch (e) {
     if (seq !== historySeq) return;
-    out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
+    if (e.status === 401) {
+      out.innerHTML = `<div class="empty">登录后可查看胜负彩复盘<br>
+        <a href="/login.html">去登录</a> · <a href="/login.html#register">免费注册</a></div>`;
+    } else {
+      out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
+    }
     $("#h-total").textContent = "";
     $("#h-pager").innerHTML = "";
   } finally {
@@ -2726,18 +2864,34 @@ async function refreshUserIcon() {
   const token = localStorage.getItem("token");
   try { if (window.checkAuth) me = await window.checkAuth(); } catch(e) {}
   if (me || token) {
-    userIcon.textContent = "⚽️" + (me ? " " + me.username : "");
+    // 头像元素在现在的 header 里可能不存在；这里不能裸写 textContent，
+    // 否则第一行就抛 TypeError，下面的下拉菜单和会员 CTA 全都不会更新。
+    if (userIcon) userIcon.textContent = "⚽️" + (me ? " " + me.username : "");
     document.getElementById("dd-login").style.display = "none";
     document.getElementById("dd-register").style.display = "none";
     document.getElementById("dd-center").style.display = "block";
     document.getElementById("dd-logout").style.display = "block";
   } else {
-    userIcon.textContent = "⚽️";
+    if (userIcon) userIcon.textContent = "⚽️";
     document.getElementById("dd-login").style.display = "block";
     document.getElementById("dd-register").style.display = "block";
     document.getElementById("dd-center").style.display = "none";
     document.getElementById("dd-logout").style.display = "none";
   }
+  // 能力介绍的 CTA：会员不再劝注册；已登录但未开会员改成「开通会员」
+  document.querySelectorAll("[data-hero-cta]").forEach(cta => {
+    if (me && me.is_member) { cta.style.display = "none"; return; }
+    cta.style.display = "flex";
+    const a = cta.querySelector("[data-hero-cta-link]");
+    const txt = cta.querySelector("[data-hero-cta-text]");
+    if (me) {
+      if (a) { a.textContent = "开通会员"; a.href = "/center.html"; }
+      if (txt) txt.textContent = "已登录；开通会员后即可运行完整预测、保存赛前快照并查看赛后复盘。";
+    } else {
+      if (a) { a.textContent = "注册 / 开通会员"; a.href = "/login.html#register"; }
+      if (txt) txt.textContent = "游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。";
+    }
+  });
 }
 refreshUserIcon();
 
@@ -3020,6 +3174,9 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
 document.addEventListener("click", async function(e) {
   const btn = e.target.closest(".jc-predict");
   if (!btn || btn.disabled) return;
+  // 防连点：ensureMember 是异步的，弹窗前这几十毫秒里再点一次会开出第二个弹窗。
+  if (btn.dataset.busy === "1") return;
+  btn.dataset.busy = "1";
   const token = localStorage.getItem("token");
   if (!token) {
     location.href = "/login.html";
@@ -3027,71 +3184,72 @@ document.addEventListener("click", async function(e) {
   }
   // 检查会员状态
   const me = await window.ensureMember();
-  if (!me) return;
+  if (!me) { delete btn.dataset.busy; return; }
   const fid = btn.dataset.fid;
-  if (!fid) return;
-  
+  if (!fid) { delete btn.dataset.busy; return; }
+
   // 禁用按钮，显示加载中
   // 先弹窗提示
-  showModal(`AI 预测引擎启动中\n\n正在调用 XGBoost 梯度提升模型进行多维度特征分析，结合 Poisson 分布计算进球概率，同步检索球员伤停、近期状态、历史交锋、主客场战绩等 200+ 特征维度。\n\nAI 大模型正在综合研判，预计耗时 1～3 分钟，请耐心等待...`, {
+  showModal(`AI 分析引擎启动中\n\n预计 30–60 秒，请稍候…`, {
     onOk: async () => {
       btn.disabled = true;
       btn.innerHTML = '<span class="spin"></span>';
-      await doPredict(btn, fid, token);
+      await doPredict(btn, fid);
     }
   });
 });
 
-async function doPredict(btn, fid, token) {
+/* 体彩页的「预测比赛」结果就地展开在本行下方，不跳预测页。
+   同屏只留一张：再点别的场次会先收掉上一张，避免 10 场比赛堆 10 张卡。 */
+function showJcInline(tr, html) {
+  document.querySelectorAll("#jc-out tr.jc-inline").forEach(r => r.remove());
+  const row = document.createElement("tr");
+  row.className = "jc-inline";
+  row.innerHTML = `<td colspan="6">${html}</td>`;
+  tr.parentNode.insertBefore(row, tr.nextSibling);
+  return row;
+}
+
+async function doPredict(btn, fid) {
+  // 最后一道在途锁：即使弹窗「确定」被连点，也只会真正发一次预测请求。
+  if (btn.dataset.running === "1") return;
+  btn.dataset.running = "1";
+  const tr = btn.closest("tr");
+  const row = tr ? showJcInline(tr,
+    `<div class="loading">正在预测 fixture <span class="num">${esc(fid)}</span> …</div>`) : null;
   try {
-    const res = await fetch(`/api/predict/${fid}`, {
-      method: "POST",
-      headers: { Authorization: "Bearer " + token }
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      showModal(err.detail || "预测失败");
-      btn.textContent = "预测比赛";
-      btn.disabled = false;
-      return;
+    // 队名/联赛等信息在 fixture 接口，预测接口只回数字
+    const fixtureP = api(`/api/fixtures/${fid}`)
+      .then(r => r.body).catch(() => null);
+    const res = await api(`/api/predict/${fid}`, { method: "POST" });
+    const fixture = await fixtureP;
+    const rec = normalizePredict(res.body.result, fixture);
+
+    if (row) {
+      row.querySelector("td").innerHTML =
+        `<div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+           <button class="ghost" type="button" data-inline-close>收起</button>
+         </div>` +
+        renderRecord(rec, { raw: res.body }) +
+        `<div class="hint" style="margin-top:8px">已写入 predictions 表</div>`;
+      row.querySelector("[data-inline-close]").onclick = () => row.remove();
+      row.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-    const data = await res.json();
-    // 预测完成，显示详情按钮
-    btn.textContent = "预测比赛";
-    btn.disabled = false;
-    // 跳转到预测页显示结果
-    switchTab("predict");
-    renderPredictResult(data);
-    // 在按钮后面添加详情按钮
-    let detailBtn = btn.nextElementSibling;
-    if (!detailBtn || !detailBtn.classList.contains("jc-detail")) {
-      detailBtn = document.createElement("button");
-      detailBtn.className = "act small jc-detail";
-      detailBtn.style.background = "#f87171";
-      detailBtn.style.marginLeft = "8px";
-      detailBtn.style.display = "inline-block";
-      detailBtn.textContent = "预测详情";
-      detailBtn.dataset.fid = fid;
-      detailBtn.onclick = () => { showPredictDetailById(parseInt(fid, 10)); };
-      btn.parentNode.insertBefore(detailBtn, btn.nextSibling);
+  } catch (err) {
+    // 非会员/登录失效统一走 ensureMember 的弹框，别在这里弹一串 HTTP 码
+    const detail = err.detail || err.message || "预测失败";
+    const msg = typeof detail === "string" ? detail : "预测失败";
+    if (row) {
+      row.querySelector("td").innerHTML =
+        `<div class="err">预测失败\n${esc(msg)}</div>`;
     }
-    showModal("预测完成");
-  } catch(err) {
-    showModal("预测失败：" + err.message);
+    showModal(msg);
+  } finally {
+    delete btn.dataset.running;
+    delete btn.dataset.busy;
     btn.textContent = "预测比赛";
     btn.disabled = false;
   }
-}
-
-async function showPredictDetail(fid, data) {
-  // 检查会员状态
-  const me = await window.ensureMember();
-  if (!me) return;
-  const result = data.result || data;
-  const msg = `比赛 ${fid}\n` +
-    `预测：${result.prediction || "-"}\n` +
-    `概率：主胜 ${((result.prob_home||0)*100).toFixed(1)}% 平 ${((result.prob_draw||0)*100).toFixed(1)}% 客胜 ${((result.prob_away||0)*100).toFixed(1)}%`;
-  showModal(msg);
 }
 </script>
 <script>
@@ -3167,68 +3325,30 @@ function showModal(msg, opts = {}) {
     const ok = document.createElement("button");
     ok.className = "act";
     ok.textContent = "确定";
-    ok.onclick = () => { modal.style.display = "none"; opts.onOk && opts.onOk(); };
+    ok.onclick = () => {
+      if (ok.disabled) return;          // 双击「确定」不能触发两次（预测=两次 LLM 账单）
+      ok.disabled = true;
+      modal.style.display = "none";
+      opts.onOk && opts.onOk();
+    };
     btnsEl.appendChild(cancel);
     btnsEl.appendChild(ok);
   } else {
     const ok = document.createElement("button");
     ok.className = "act";
     ok.textContent = "确定";
-    ok.onclick = () => { modal.style.display = "none"; opts.onOk && opts.onOk(); };
+    ok.onclick = () => {
+      if (ok.disabled) return;
+      ok.disabled = true;
+      modal.style.display = "none";
+      opts.onOk && opts.onOk();
+    };
     btnsEl.appendChild(ok);
   }
   modal.style.display = "flex";
 }
 </script>
 
-
-<script>
-function renderPredictResult(data) {
-  const out = document.getElementById("predict-out");
-  if (!out) return;
-  const r = data.result || data;
-  out.innerHTML = `<div class="card">
-    <h3>预测结果</h3>
-    <div class="row"><span>预测</span><b>${r.prediction || "-"}</b></div>
-    <div class="row"><span>主胜</span><b>${((r.prob_home||0)*100).toFixed(1)}%</b></div>
-    <div class="row"><span>平</span><b>${((r.prob_draw||0)*100).toFixed(1)}%</b></div>
-    <div class="row"><span>客胜</span><b>${((r.prob_away||0)*100).toFixed(1)}%</b></div>
-    ${r.llm_analysis ? `<div class="hint" style="margin-top:12px">${r.llm_analysis}</div>` : ""}
-  </div>`;
-}
-</script>
-
-
-<script>
-async function showPredictDetailById(fid) {
-  const token = localStorage.getItem("token");
-  if (!token) { location.href = "/login.html"; return; }
-  switchTab("predict");
-  const out = document.getElementById("predict-out");
-  out.innerHTML = '<div class="loading">加载预测详情...</div>';
-  document.getElementById("fid").value = fid;
-  try {
-    const r = await fetch(`/api/predictions?fixture_id=${fid}`, {
-      headers: { Authorization: "Bearer " + token }
-    });
-    if (!r.ok) {
-      out.innerHTML = '<div class="empty">未找到该场预测记录</div>';
-      return;
-    }
-    const data = await r.json();
-    const items = data.items || [];
-    if (!items.length) {
-      out.innerHTML = '<div class="empty">未找到该场预测记录，请先预测</div>';
-      return;
-    }
-    const item = items[0];
-    const np = normalizePredict(item);
-    out.innerHTML = renderRecord(np);
-  } catch(e) {
-    out.innerHTML = '<div class="err">加载失败：' + e.message + '</div>';
-  }
-}
-</script>
 
 </body>
 </html>

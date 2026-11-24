@@ -146,20 +146,51 @@ def is_member(user: User) -> bool:
     return bool(user.expires_at and user.expires_at > datetime.utcnow())
 
 
-def create_token(user_id: int, hours: int = 0.5) -> str:  # 默认 30 分钟
+# 会话空闲超时：30 分钟没有请求才失效；有请求就滑动续期。
+# 与 Spring Security / Spring Session 的 server.servlet.session.timeout 语义一致：
+# 计的是【距最后一次活动的空闲时长】，不是从登录起算的绝对时长 ——
+# 否则正在用站的人用满 30 分钟会被硬踢下线。
+TOKEN_TTL_SECONDS = 1800
+# 剩余低于这个值才写 Redis 续期，避免每个请求都写一次（最坏 5 分钟写一次）。
+TOKEN_REFRESH_BELOW = 1500
+
+
+def create_token(user_id: int, hours: float | None = None) -> str:
+    ttl = int(hours * 3600) if hours else TOKEN_TTL_SECONDS
     token = secrets.token_urlsafe(32)
     r = get_redis()
     if r:
-        r.setex(_token_key(token), int(hours * 3600), str(user_id))
+        r.setex(_token_key(token), ttl, str(user_id))
     else:
         # fallback
         if not hasattr(create_token, "_mem"):
             create_token._mem = {}
         create_token._mem[token] = {
             "user_id": user_id,
-            "expires": datetime.utcnow() + timedelta(hours=hours),
+            "expires": datetime.utcnow() + timedelta(seconds=ttl),
         }
     return token
+
+
+def touch_token(token: str) -> None:
+    """滑动续期：把活跃会话的 TTL 拉回 30 分钟。
+
+    只在「键存在且剩余 < 25 分钟」时续 —— 已过期（ttl=-2）或不存在的不续，
+    不会把登出/被踢的 token 复活。Redis 故障时静默跳过，不能因为续期失败
+    把正常请求变成 500（token 还有剩余时长，下次请求再试）。
+    """
+    r = get_redis()
+    if not r:
+        info = getattr(create_token, "_mem", {}).get(token)
+        if info:
+            info["expires"] = datetime.utcnow() + timedelta(seconds=TOKEN_TTL_SECONDS)
+        return
+    try:
+        ttl = r.ttl(_token_key(token))
+        if 0 < ttl < TOKEN_REFRESH_BELOW:
+            r.expire(_token_key(token), TOKEN_TTL_SECONDS)
+    except Exception as e:
+        logger.warning(f"token 滑动续期失败: {e}")
 
 
 def get_user_id_from_token(token: str) -> Optional[int]:
@@ -213,6 +244,32 @@ def get_current_user(
 
 # ── 权限依赖 ──────────────────────────────────────────────
 # 规则：游客可浏览历史/赛程；预测类功能必须【登录 + 会员】。
+
+def is_local_request(request: Request) -> bool:
+    """是不是本机脚本直连 127.0.0.1:8000（tools/*.py 的历史查询走这条）。
+
+    外部请求经 cloudflared → nginx:8080 → uvicorn，nginx 一定会加
+    `X-Forwarded-For`，Cloudflare 一定会加 `CF-Connecting-IP`；两个都没有、
+    且 socket 对端是回环，才认作本机。这样既不用给一堆本地工具发 token，
+    也不会因为某个头缺失就把公网请求误判成本机。
+    """
+    if request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for"):
+        return False
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1", "localhost")
+
+
+def require_login_or_local(
+    request: Request,
+    user: Optional[User] = Depends(get_current_user),
+) -> Optional[User]:
+    """历史/复盘类只读接口：登录用户放行；本机工具直连放行；公网匿名 401。"""
+    if user:
+        return user
+    if is_local_request(request):
+        return None
+    raise HTTPException(401, "请先登录")
+
 
 def require_login(user: Optional[User] = Depends(get_current_user)) -> User:
     if not user:
@@ -359,14 +416,14 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
-    if not hit(f"login:ip:{client_ip(request)}", 10, 300):
+    # 防密码爆破：按来源 IP 和按被打的用户名各一个桶。
+    # ⚠️ 一次请求只能各记一次 hit()：曾经写成两个阈值对（10/5 和 20/10），
+    #    同一个键被计两次，实际生效上限被砍半（IP 5 次 / 账号 3 次）。
+    ip = client_ip(request)
+    if not hit(f"login:ip:{ip}", 10, 300):
         raise HTTPException(429, "登录尝试过多，请5分钟后再试")
     if not hit(f"login:user:{body.username}", 5, 300):
         raise HTTPException(429, "该账号登录失败次数过多，请5分钟后再试")
-    # 防密码爆破：按来源 IP 和按被打的用户名各一个桶
-    ip = client_ip(request)
-    if not hit(f"login:ip:{ip}", 20, 300) or not hit(f"login:user:{body.username}", 10, 300):
-        raise HTTPException(429, "尝试过于频繁，请稍后再试")
     if not verify_captcha(body.captcha_id, body.captcha_code):
         raise HTTPException(400, "验证码错误或已过期")
     user = db.query(User).filter(User.username == body.username).first()
@@ -489,8 +546,14 @@ def admin_reset_password(
 
 
 @router.get("/check-username")
-def check_username(username: str, db: Session = Depends(get_db)):
-    """检查用户名是否可用"""
+def check_username(username: str, request: Request, db: Session = Depends(get_db)):
+    """检查用户名是否可用。
+
+    注册页需要它，所以保持公开；但加 IP 限速 —— 这个接口只返回「存在/不存在」，
+    不限速就是用户名枚举器。
+    """
+    if not hit(f"checkuser:ip:{client_ip(request)}", 30, 60):
+        raise HTTPException(429, "查询过于频繁，请稍后再试")
     exists = db.query(User).filter(User.username == username).first() is not None
     return {"available": not exists, "username": username}
 
@@ -498,9 +561,21 @@ def check_username(username: str, db: Session = Depends(get_db)):
 from app.models.recharge_log import RechargeLog
 import random
 
+def _mask_username(name: str) -> str:
+    """滚动条只露首字，别把真实用户名整批送出去。"""
+    s = (name or "").strip()
+    return (s[0] + "***") if s else "***"
+
+
 @router.get("/recharge-ticker")
-def recharge_ticker(db: Session = Depends(get_db)):
-    """随机返回 30 条充值记录用于滚动条"""
+def recharge_ticker(request: Request, db: Session = Depends(get_db)):
+    """随机返回 30 条充值记录用于滚动条。
+
+    这是登录页的装饰性数据，保持公开；但用户名必须脱敏 —— 原实现匿名返回
+    30 条真实用户名 + 套餐 + 金额，多刷几轮就能收集用户和消费信息。
+    """
+    if not hit(f"ticker:ip:{client_ip(request)}", 60, 60):
+        raise HTTPException(429, "请求过于频繁，请稍后再试")
     total = db.query(RechargeLog).count()
     if total == 0:
         return []
@@ -510,7 +585,7 @@ def recharge_ticker(db: Session = Depends(get_db)):
     rows = db.query(RechargeLog).filter(RechargeLog.id.in_(sample)).order_by(RechargeLog.created_at.desc()).all()
     return [
         {
-            "username": r.username,
+            "username": _mask_username(r.username),
             "plan": r.plan,
             "amount": float(r.amount),
             "time": r.created_at.strftime("%m-%d %H:%M") if r.created_at else "",

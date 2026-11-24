@@ -19,8 +19,17 @@ def hit(key: str, limit: int, window: int) -> bool:
     return True
 
 def client_ip(request) -> str:
-    """Extract client IP from request."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Extract the client IP used as the rate-limit bucket key.
+
+    Behind the Cloudflare Tunnel the only trustworthy source is
+    ``CF-Connecting-IP``: Cloudflare sets it at the edge and overwrites anything
+    the browser sent. ``X-Forwarded-For`` must NOT be used here — nginx appends
+    to it (``$proxy_add_x_forwarded_for``), so its leftmost entry is whatever the
+    caller typed, and an attacker could rotate it to get a fresh bucket per
+    request. Direct local calls have no CF header and fall back to the real
+    socket peer (127.0.0.1), which is fine because uvicorn only listens locally.
+    """
+    cf = (request.headers.get("cf-connecting-ip") or "").strip()
+    if cf:
+        return cf
     return request.client.host if request.client else "unknown"

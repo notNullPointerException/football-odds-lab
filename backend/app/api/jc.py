@@ -17,9 +17,10 @@ import json
 import time
 import urllib.request
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
+from app.core.rate_limit import client_ip, hit
 from app.db.session import SessionLocal
 from app.services import jc_match_service
 
@@ -198,8 +199,11 @@ def _build_payload() -> dict:
 
 
 @router.get("/jc/matches")
-async def jc_matches(refresh: bool = False):
+async def jc_matches(request: Request, refresh: bool = False):
     """体彩竞彩足球实时赛程 + 开盘赔率（去水概率）。与体彩官网保持一致。"""
+    # refresh=true 会绕过 15s 缓存直接打体彩上游；按 IP 限速，防脚本反复穿透缓存。
+    if refresh and not hit(f"jc:refresh:ip:{client_ip(request)}", 10, 60):
+        raise HTTPException(status_code=429, detail="刷新过于频繁，请稍后再试")
     now = time.time()
     if not refresh and _cache["payload"] is not None and now - _cache["at"] < _CACHE_TTL:
         return {**_cache["payload"], "cached": True}

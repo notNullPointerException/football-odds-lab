@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 
+from app.api.auth import require_admin
 from app.db.session import get_db
 from app.models.fixture import Fixture, FixtureEvent, FixtureLineup, FixtureStatistic, FixturePlayerStat
 from app.schemas.fixture import FixtureSchema, FixtureDetailSchema
@@ -68,8 +69,12 @@ def _get_sync(db, fixture_id):
 
 @router.patch("/fixtures/{fixture_id}/category")
 async def set_fixture_category(fixture_id: int, category: str | None = None,
-                                db: Session = Depends(get_db)):
-    """设置或清除比赛分类标签（category=jingzu 或 category=null 清除）"""
+                                db: Session = Depends(get_db),
+                                _admin=Depends(require_admin)):
+    """设置或清除比赛分类标签（category=jingzu 或 category=null 清除）。
+
+    写库操作，必须管理员；前端没有调用点，原本是留给后台/脚本用的。
+    """
     def _run():
         f = db.query(Fixture).filter(Fixture.id == fixture_id).first()
         if not f:

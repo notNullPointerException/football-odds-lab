@@ -17,7 +17,7 @@ from app.api.scheduler import router as scheduler_router
 from app.api.predictions import router as predictions_router
 from app.api.jc import router as jc_router
 from app.api.sfc import router as sfc_router
-from app.api.auth import router as auth_router
+from app.api.auth import router as auth_router, touch_token
 from app.services.scheduler import init_scheduler, shutdown_scheduler
 
 # 初始化日志
@@ -90,6 +90,26 @@ async def security_headers(request, call_next):
         "frame-ancestors 'none'; base-uri 'self'",
     )
     return response
+
+
+@app.middleware("http")
+async def sliding_session(request, call_next):
+    """滑动的会话过期（Spring Session 式空转超时，不是登录后固定 30 分钟）。
+
+    只要有请求带着 Bearer token，就把 Redis 里该 token 的 TTL 拉回 30 分钟
+    （剩余 < 25 分钟才写，见 touch_token）。放在中间件而不是 get_current_user：
+    赛程/竞彩/体彩这些公开浏览接口没有 auth 依赖，用户一直翻它们也必须算活跃，
+    否则正在用站的人还是会被登录满 30 分钟硬踢下线。
+
+    Redis 操作丢线程池，不阻塞事件循环；续期失败只记日志，不影响正常请求。
+    """
+    authorization = request.headers.get("authorization") or ""
+    if authorization.startswith("Bearer "):
+        try:
+            await asyncio.to_thread(touch_token, authorization[7:])
+        except Exception:
+            pass
+    return await call_next(request)
 
 # 注册路由
 app.include_router(leagues_router, prefix="/api", tags=["Leagues"])

@@ -230,6 +230,27 @@ $("#btn-recharge").onclick = () => {
   // TODO: 跳转到支付页或弹出二维码
 };
 
+// ── 页面心跳保活：页面开着就算在线 ──
+// 与首页同一套逻辑：每 10 分钟带 token 打一次 /api/auth/me，
+// 后端中间件把 30 分钟的空闲 TTL 续回去；真过期了才回登录页。
+(function () {
+  if (!localStorage.getItem("token")) return;
+  setInterval(async function () {
+    const tok = localStorage.getItem("token");
+    if (!tok) return;
+    try {
+      const r = await fetch("/api/auth/me", {
+        headers: { Authorization: "Bearer " + tok },
+        cache: "no-store"
+      });
+      if (r.status === 401) {
+        localStorage.removeItem("token");
+        location.href = "/login.html";
+      }
+    } catch (e) {}
+  }, 10 * 60 * 1000);
+})();
+
 loadUser();
 loadTicker();
 setInterval(loadTicker, 5 * 60 * 1000);

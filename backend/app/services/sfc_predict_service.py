@@ -10,7 +10,7 @@
     它也只覆盖 `leagues.enabled=1` 且落在「今天 10:10 ~ 次日 10:10」窗口内的比赛。
     胜负彩常含 disabled 联赛（欧国联就是）和 2~3 天后的场次，天然覆盖不到。
   · 所以这里只按【胜负彩自己的 14 场】取数，有 fixture_id 的逐场
-    `POST /api/predict/{id}`，跑完再 `POST /api/sfc/archive` 强制归档。
+    `POST /api/predict/{id}`，跑完再直接调 `archive_payload()` 强制归档。
     归档走的是原有的 COALESCE 路径：先有 predictions，再把头块填进快照。
 
 红线：
@@ -195,14 +195,19 @@ def sfc_predict_job(db=None) -> dict:
 
         # 预测成功后立刻强制归档一次：不依赖 13:15 / 21:15 的存档任务。
         # 存档失败不影响预测结果（predictions 已经落库），定时存档会再 COALESCE。
-        # 这里可以走 HTTP 归档：本 job 已经确认 sale_end > now，且只在本期有成功
-        # 预测时才调；与 sfc_archive_job 那条「别走 POST /api/sfc/archive」的约束
-        # 不冲突——那条针对的是「本期无在售」也返回 502 的歧义，不是禁止所有调用。
+        # 🔴 这里【不再走 HTTP】POST /api/sfc/archive：该端点现在要求管理员 token，
+        #    定时任务没有登录态，走 HTTP 会 401。直接调 service 层（与 sfc_archive_job
+        #    同一条路径）既不需要伪造 token，也避免「无在售期返回 502」的歧义。
         if stats["predicted"]:
             try:
-                r = client.post("/api/sfc/archive", timeout=FETCH_TIMEOUT)
+                from app.api.sfc import _build_payload       # 惰性 import，避免模块环
+                from app.services.sfc_archive_service import archive_payload
+
+                payload = _build_payload()
+                r = archive_payload(payload)
                 logger.info(
-                    f"[SFC预测] {issue} 强制存档 HTTP {r.status_code}: {r.text[:300]}"
+                    f"[SFC预测] {issue} 强制存档: 期 {r.get('issue')} / "
+                    f"{r.get('matches')} 场（有预测 {r.get('with_pred')}）"
                 )
             except Exception as e:
                 logger.error(f"[SFC预测] {issue} 强制存档失败 {type(e).__name__}: {e}")

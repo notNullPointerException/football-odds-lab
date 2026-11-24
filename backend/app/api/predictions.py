@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.api.auth import require_member
+from app.api.auth import require_login_or_local, require_member
 from app.core.rate_limit import hit
 from app.services.context_service import EMPTY_CTX, context_for_fixtures
 # 从 prediction.errors 拿：这个模块只有 stdlib，import 它不会把 pandas/xgboost 拖起来
@@ -54,9 +54,17 @@ async def predict_match(fixture_id: int, _member=Depends(require_member)):
       502 + 具体原因 = 该场预测【跑了但没跑成】（LLM 超时 / 联赛没模型 / 特征不足）→ 可重跑
       400 "无需预测"  = 【压根不该跑】（查无此场 / 命中黑名单）→ 重跑也没用
     """
-    # 每场预测都要真金白银调 LLM：按用户限速，防脚本刷爆账单
-    if not hit(f"predict:u:{_member.id}", 120, 3600):
-        raise HTTPException(status_code=429, detail="预测请求过于频繁，请稍后再试")
+    # 每场预测都要真金白银调 LLM：三道按用户限速，防脚本/连点刷爆账单。
+    # ① 同一场 15 秒内只跑一次 —— 防双击、防刷新页面后立刻重跑。
+    # ② 每分钟 30 次 —— 足够 14 场批量预测（14 次）+ 若干单场，挡得住高频脚本。
+    # ③ 每小时 120 次 —— 保留原有总量上限（14 场批量≈8 批/小时）。
+    uid = _member.id
+    if not hit(f"predict:u:{uid}:f:{fixture_id}", 1, 15):
+        raise HTTPException(status_code=429, detail="同一场比赛 15 秒内只能预测一次，请稍后再试")
+    if not hit(f"predict:u:{uid}:min", 30, 60):
+        raise HTTPException(status_code=429, detail="预测请求过于频繁（每分钟最多 30 次），请稍后再试")
+    if not hit(f"predict:u:{uid}", 120, 3600):
+        raise HTTPException(status_code=429, detail="预测请求过于频繁（每小时最多 120 次），请稍后再试")
     def _run():
         from prediction.predict import predict_fixture
         return predict_fixture(fixture_id)
@@ -78,7 +86,15 @@ async def get_predictions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    _user=Depends(require_login_or_local),
 ):
+    """历史预测列表（登录后可看；本机脚本直连仍放行）。
+
+    🔴 不要求会员：历史是「已开奖的复盘」，属于注册用户的浏览权益；
+    真正付费的是【对未开赛场次跑新预测】。但必须挡掉公网匿名全量抓取 ——
+    这里含 llm_deep_report / 伤停 / 首发原文 / 两套盘，等于整份付费分析。
+    本机 tools/*.py 走 127.0.0.1 直连，没有 CF/XFF 头，继续免 token。
+    """
     return await asyncio.to_thread(
         _get_predictions_sync, db, date, category, page, page_size
     )

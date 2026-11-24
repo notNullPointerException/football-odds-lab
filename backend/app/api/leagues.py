@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
+from app.api.auth import require_admin
 from app.db.session import get_db
 from app.models.league import League
 from app.schemas.league import LeagueDetailSchema, PaginatedResponse
@@ -51,7 +52,9 @@ def _get_league_sync(db, league_id):
 
 
 @router.patch("/leagues/{league_id}/toggle")
-async def toggle_league(league_id: int, db: Session = Depends(get_db)):
+async def toggle_league(league_id: int, db: Session = Depends(get_db),
+                        _admin=Depends(require_admin)):
+    """开关联赛的同步开关。写库操作，必须管理员。"""
     return await asyncio.to_thread(_toggle_league_sync, db, league_id)
 
 

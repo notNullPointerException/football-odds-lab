@@ -15,14 +15,16 @@ import json
 import re
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from loguru import logger
 from sqlalchemy import text
 
 # 去水公式(_parse_pool→_devig)、HTTP 打点、竞彩 URL 都和竞彩页共用同一份，
 # 避免两个页面各算一套数字；fixture_id 也共用同一个解析 service，
 # 保证同一场比赛在两个页面上显示出来的 id 永远一致。
+from app.api.auth import require_admin, require_login_or_local
 from app.api.jc import _JC_URL, _http_json, _parse_pool
+from app.core.rate_limit import client_ip, hit
 from app.db.session import SessionLocal
 from app.services import jc_match_service, sfc_archive_service, sfc_check_service
 
@@ -419,8 +421,11 @@ def _archive_best_effort(payload: dict, force: bool = False) -> dict | None:
 
 
 @router.get("/sfc/matches")
-async def sfc_matches(refresh: bool = False):
+async def sfc_matches(request: Request, refresh: bool = False):
     """胜负彩（14 场胜负游戏）实时场次 + 胜平负赔率（去水）。与体彩官网保持一致。"""
+    # refresh=true 会绕过 15s 缓存直接打体彩上游；按 IP 限速，防脚本反复穿透缓存。
+    if refresh and not hit(f"sfc:refresh:ip:{client_ip(request)}", 10, 60):
+        raise HTTPException(status_code=429, detail="刷新过于频繁，请稍后再试")
     now = time.time()
     if not refresh and _cache["payload"] is not None and now - _cache["at"] < _CACHE_TTL:
         payload, flags = _cache["payload"], {"cached": True}
@@ -445,8 +450,13 @@ async def sfc_matches(refresh: bool = False):
 
 
 @router.post("/sfc/archive")
-async def sfc_archive_now():
-    """手动存档本期（SFC 页的「存档本期」按钮）。强制真拉一次上游，绕过 120 秒防抖。"""
+async def sfc_archive_now(_admin=Depends(require_admin)):
+    """手动存档本期（SFC 页的「存档本期」按钮）。强制真拉一次上游，绕过 120 秒防抖。
+
+    必须管理员：这个端点会强制打上游并写库，页面上的按钮本来也只在 admin 登录时显示。
+    """
+    if not hit(f"sfc:archive:u:{_admin.id}", 10, 600):
+        raise HTTPException(status_code=429, detail="存档过于频繁，请稍后再试")
     try:
         payload = await asyncio.to_thread(_build_payload)
     except Exception as e:
@@ -462,12 +472,20 @@ async def sfc_archive_now():
 
 
 @router.get("/sfc/issues")
-async def sfc_issues(page: int = 1, page_size: int = 20, date: str | None = None):
+async def sfc_issues(request: Request, page: int = 1, page_size: int = 20,
+                     date: str | None = None,
+                     _user=Depends(require_login_or_local)):
     """归档过的每期胜负彩 + 每期复盘（每个头错几场 / 错在哪）。给「历史」页的分类下拉用。
 
     顺带存档当前期：能看到历史页的这一刻，当前期的数据还在手上 —— 存档的成本是
     一次 14 行 upsert，比"下期开始这期就没了"便宜太多。拉不到只警告，不影响读历史。
+
+    🔴 2026-11-24 起要求登录（免费注册即可）：复盘卡里含五个头的逐场对错和预测值，
+    和 /api/predictions 一样属于分析内容，不再让匿名全量拉取。
     """
+    # 这个端点每次缓存过期都会顺带打上游；给个宽松的 IP 限速，别让游客反复触发。
+    if not hit(f"sfc:issues:ip:{client_ip(request)}", 60, 60):
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
     now = time.time()
     if _cache["payload"] is None or now - _cache["at"] >= _CACHE_TTL:
         try:
@@ -672,11 +690,14 @@ async def sfc_check_changelog(code: str | None = None, limit: int = 50):
 
 
 @router.get("/sfc/check")
-async def sfc_check(issue: str | None = None, format: str = "json"):
+async def sfc_check(request: Request, issue: str | None = None, format: str = "json"):
     """对照规则表校验某一期（默认最新一期）：要求 + 本期实测指标 + 逐条判定。
 
     format=text 返回同一份内容的可读报告（给人粘贴用），数据完全一致。
     """
+    # 故意不锁登录（curl 工作流要用），但仍要限速：每次都要跑校验计算。
+    if not hit(f"sfc:check:ip:{client_ip(request)}", 30, 60):
+        raise HTTPException(status_code=429, detail="校验请求过于频繁，请稍后再试")
     d = await asyncio.to_thread(sfc_check_service.check, issue)
     if format == "text":
         from fastapi.responses import PlainTextResponse
@@ -689,8 +710,8 @@ async def sfc_check(issue: str | None = None, format: str = "json"):
 
 
 @router.get("/sfc/ticket")
-async def sfc_ticket(issue: str | None = None, budget: float | None = None,
-                     format: str = "text"):
+async def sfc_ticket(request: Request, issue: str | None = None,
+                     budget: float | None = None, format: str = "text"):
     """复式单测算：给定预算，本期买到什么票面、成本多少、期望回报率多少。
 
     🔴 为什么是【独立端点】而不是塞进 /sfc/check：X-2 表里的原文是「本接口只做体检和
@@ -701,6 +722,8 @@ async def sfc_ticket(issue: str | None = None, budget: float | None = None,
 
     budget 单位是【元】（成本），不传则印 128 / 512 / 2048 三档阶梯。
     """
+    if not hit(f"sfc:ticket:ip:{client_ip(request)}", 30, 60):
+        raise HTTPException(status_code=429, detail="票面测算请求过于频繁，请稍后再试")
     d = await asyncio.to_thread(sfc_check_service.ticket, issue, budget)
     if format == "text":
         from fastapi.responses import PlainTextResponse
