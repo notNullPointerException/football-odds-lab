@@ -3198,5 +3198,37 @@ function renderPredictResult(data) {
 }
 </script>
 
+
+<script>
+async function showPredictDetailById(fid) {
+  const token = localStorage.getItem("token");
+  if (!token) { location.href = "/login.html"; return; }
+  switchTab("predict");
+  const out = document.getElementById("predict-out");
+  out.innerHTML = '<div class="loading">加载预测详情...</div>';
+  document.getElementById("fid").value = fid;
+  try {
+    const r = await fetch(`/api/predictions?fixture_id=${fid}`, {
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (!r.ok) {
+      out.innerHTML = '<div class="empty">未找到该场预测记录</div>';
+      return;
+    }
+    const data = await r.json();
+    const items = data.items || [];
+    if (!items.length) {
+      out.innerHTML = '<div class="empty">未找到该场预测记录，请先预测</div>';
+      return;
+    }
+    const item = items[0];
+    const np = normalizePredict(item);
+    out.innerHTML = renderRecord(np);
+  } catch(e) {
+    out.innerHTML = '<div class="err">加载失败：' + e.message + '</div>';
+  }
+}
+</script>
+
 </body>
 </html>
