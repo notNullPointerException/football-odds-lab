@@ -5,7 +5,7 @@ import hmac
 import json
 import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
@@ -17,6 +17,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.core.redis_client import get_redis
 from app.core.rate_limit import hit, client_ip
+from app.services.audit_service import log_action
 
 router = APIRouter()
 
@@ -96,6 +97,7 @@ class LoginIn(BaseModel):
     password: str = Field(max_length=64)
     captcha_id: str = Field(default="", max_length=64)
     captcha_code: str = Field(default="", max_length=16)
+    remember: bool = False   # 勾「保持登录」→ 30 天 token；否则仍是 30 分钟空闲超时
 
 
 class UserOut(BaseModel):
@@ -110,8 +112,23 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
+# 数据库里的 expires_at 是 UTC（datetime.utcnow 写入）；对外一律转成北京时间输出。
+# 只改展示，不改存储：is_member/续费计算仍用 UTC 比较，存量数据不用迁移。
+BJ_TZ = timezone(timedelta(hours=8))
+
+
+def _to_bj(dt: Optional[datetime]) -> Optional[datetime]:
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(BJ_TZ)
+
+
 def _user_out(user: User) -> UserOut:
     out = UserOut.model_validate(user)
+    # 带 +08:00 的 ISO，前端 new Date()/切片显示都是北京时间
+    out.expires_at = _to_bj(user.expires_at)
     out.is_member = is_member(user)
     return out
 
@@ -153,6 +170,9 @@ def is_member(user: User) -> bool:
 TOKEN_TTL_SECONDS = 1800
 # 剩余低于这个值才写 Redis 续期，避免每个请求都写一次（最坏 5 分钟写一次）。
 TOKEN_REFRESH_BELOW = 1500
+# 勾选「保持登录」时的会话时长（30 天）。与登录页的「记住账号密码」是两件事：
+# 这个只管 token 活多久，账号密码回填由浏览器本地存储单独负责。
+REMEMBER_TTL_HOURS = 24 * 30
 
 
 def create_token(user_id: int, hours: float | None = None) -> str:
@@ -237,6 +257,8 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         return None
+    # 滑动续期在 main.py 的 sliding_session 中间件里统一做（带 Bearer 的请求都算活跃），
+    # 这里不再重复 touch，避免每个已登录请求多打一次 Redis。
     # ⚠️ 这里【不判会员到期】：到期只是失去预测权限，登录/浏览照常。
     # 会员门槛放在 require_member 里，只挡付费功能。
     return user
@@ -281,7 +303,11 @@ def require_member(user: Optional[User] = Depends(get_current_user)) -> User:
     if not user:
         raise HTTPException(401, "请先登录")
     if not is_member(user):
-        raise HTTPException(403, "会员未开通或已到期，请开通会员")
+        # expires_at 有值 = 开过会员但已到期（如周卡用完了），要提示续费，
+        # 不能和「从未开通」用同一句话，否则老用户看不出是哪种情况。
+        if user.expires_at:
+            raise HTTPException(403, "会员已到期，请续费后再使用预测功能")
+        raise HTTPException(403, "该功能需要会员，请先开通会员")
     return user
 
 
@@ -392,7 +418,6 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(400, "密码最长12位")
     if is_weak_password(body.password):
         raise HTTPException(400, "密码太简单，请包含字母和数字，且不少于6位")
-    print(f"[login] captcha_id={body.captcha_id}, code={body.captcha_code}")
     if not verify_captcha(body.captcha_id, body.captcha_code):
         raise HTTPException(400, "验证码错误或已过期")
     existing = db.query(User).filter(User.username == body.username).first()
@@ -411,6 +436,12 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     token = create_token(user.id)
+    log_action(
+        user_id=user.id, username=user.username, action_type="auth",
+        action="注册", method="POST", path="/api/auth/register", status_code=200,
+        ip=client_ip(request), ua=request.headers.get("user-agent", "")[:512],
+        duration_ms=0,
+    )
     return {"token": token, "user": _user_out(user)}
 
 
@@ -428,8 +459,20 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(400, "验证码错误或已过期")
     user = db.query(User).filter(User.username == body.username).first()
     if not user or not verify_password(body.password, user.password_hash):
+        log_action(
+            username=body.username, action_type="auth",
+            action="登录失败：用户名或密码错误", method="POST",
+            path="/api/auth/login", status_code=401, ip=ip,
+            ua=request.headers.get("user-agent", "")[:512], duration_ms=0,
+        )
         raise HTTPException(401, "用户名或密码错误")
     if not user.is_active:
+        log_action(
+            user_id=user.id, username=user.username, action_type="auth",
+            action="登录失败：账号已禁用", method="POST",
+            path="/api/auth/login", status_code=403, ip=ip,
+            ua=request.headers.get("user-agent", "")[:512], duration_ms=0,
+        )
         raise HTTPException(403, "账号已禁用")
     # 旧格式（sha256 / pbkdf2）在成功登录后静默升级成 bcrypt（用户无感）
     if needs_password_upgrade(user.password_hash):
@@ -438,7 +481,13 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     # 会员到期不影响登录，只影响预测功能（见 require_member）
     if user.expires_at and user.role != "admin":
         set_user_expiry(user.id, user.expires_at)
-    token = create_token(user.id)
+    token = create_token(user.id, hours=REMEMBER_TTL_HOURS if body.remember else None)
+    log_action(
+        user_id=user.id, username=user.username, action_type="auth",
+        action="登录（保持登录）" if body.remember else "登录",
+        method="POST", path="/api/auth/login", status_code=200, ip=ip,
+        ua=request.headers.get("user-agent", "")[:512], duration_ms=0,
+    )
     return {"token": token, "user": _user_out(user)}
 
 
@@ -448,12 +497,20 @@ def me(user: User = Depends(require_login)):
 
 
 @router.post("/logout")
-def logout(authorization: Optional[str] = Header(None)):
+def logout(request: Request, authorization: Optional[str] = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
+        uid = get_user_id_from_token(token)
         r = get_redis()
         if r:
             r.delete(_token_key(token))
+        if uid:
+            log_action(
+                user_id=uid, action_type="auth", action="退出登录",
+                method="POST", path="/api/auth/logout", status_code=200,
+                ip=client_ip(request), ua=request.headers.get("user-agent", "")[:512],
+                duration_ms=0,
+            )
     return {"ok": True}
 
 @router.post("/activate")
@@ -483,7 +540,9 @@ def activate_user(
     db.commit()
     if user.expires_at and user.role != "admin":
         set_user_expiry(user.id, user.expires_at)
-    return {"msg": f"已激活 {username}，到期 {user.expires_at}", "is_member": is_member(user)}
+    exp_bj = _to_bj(user.expires_at)
+    return {"msg": f"已激活 {username}，到期 {exp_bj:%Y-%m-%d %H:%M}（北京时间）",
+            "is_member": is_member(user)}
 
 @router.get("/admin/users")
 def admin_list_users(db: Session = Depends(get_db), _admin: User = Depends(require_admin)):

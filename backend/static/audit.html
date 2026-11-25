@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes">
+<title>用户操作日志 · AI Football</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a3040;
+    --fg:#e6e9ef; --dim:#8b93a5; --dim2:#5d6678;
+    --acc:#4a9eff; --ok:#2ecc71; --bad:#ff5f6d; --warn:#ffb020;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  code,.num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  header{
+    position:sticky;top:0;z-index:20;background:rgba(15,17,21,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+    padding:10px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  }
+  h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.3px}
+  main{max-width:1180px;margin:0 auto;padding:18px}
+  .bar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  }
+  .bar label{color:var(--dim);font-size:12px}
+  input,select,button{font-family:inherit;font-size:13px}
+  input[type=text],select{
+    background:var(--bg);border:1px solid var(--line);color:var(--fg);
+    padding:6px 9px;border-radius:7px;outline:none;
+  }
+  input:focus,select:focus{border-color:var(--acc)}
+  button.act{
+    background:var(--acc);border:1px solid var(--acc);color:#04121f;
+    padding:7px 16px;border-radius:7px;cursor:pointer;font-weight:600;
+  }
+  button.act:hover{filter:brightness(1.1)}
+  button.ghost{
+    background:transparent;border:1px solid var(--line);color:var(--dim);
+    padding:6px 12px;border-radius:7px;cursor:pointer;
+  }
+  button.ghost:hover:not(:disabled){color:var(--fg);border-color:var(--dim2)}
+  button.ghost:disabled{opacity:.35;cursor:not-allowed}
+  a.ghost-link{
+    color:var(--dim);text-decoration:none;border:1px solid var(--line);
+    padding:6px 12px;border-radius:7px;font-size:13px;white-space:nowrap;
+  }
+  a.ghost-link:hover{color:var(--fg);border-color:var(--dim2)}
+  .hint{color:var(--dim2);font-size:12px}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    margin-top:12px;overflow:hidden;
+  }
+  .card>.hd{
+    padding:11px 14px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .card>.bd{padding:0;overflow:auto}
+  .pager{
+    display:flex;align-items:center;justify-content:flex-end;gap:10px;
+    padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap;
+  }
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}
+  th{color:var(--dim);font-weight:500;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+  tbody tr:hover{background:var(--panel2)}
+  /* 手机端（<=720px）：宽表改成竖向卡片，每个 td 的 data-label 当行标题 */
+  @media(max-width:720px){
+    header{padding:10px 14px}
+    main{padding:14px}
+    .rtable{display:block;width:100%}
+    .rtable thead{display:none}
+    .rtable tbody{display:block}
+    .rtable tr{display:block;padding:12px 14px;border-bottom:1px solid var(--line)}
+    .rtable tr:last-child{border-bottom:none}
+    .rtable tr:hover{background:transparent}
+    .rtable td{display:block;width:auto;padding:0;border:none;margin-top:10px}
+    .rtable td:first-child{margin-top:0}
+    .rtable td[data-label]::before{
+      content:attr(data-label);display:block;color:var(--dim2);
+      font-size:10px;letter-spacing:.6px;margin-bottom:3px;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>用户操作日志</h1>
+  <span class="hint" id="who"></span>
+  <span style="flex:1"></span>
+  <a class="ghost-link" href="/">返回预测台</a>
+</header>
+<main>
+  <div class="bar">
+    <span style="display:flex;align-items:center;gap:6px">
+      <label for="f-user">用户名</label>
+      <input id="f-user" type="text" placeholder="全部用户" autocomplete="off"
+             autocapitalize="none" autocorrect="off" spellcheck="false">
+    </span>
+    <span style="display:flex;align-items:center;gap:6px">
+      <label for="f-type">类型</label>
+      <select id="f-type">
+        <option value="">全部</option>
+        <option value="api">接口</option>
+        <option value="menu">菜单</option>
+        <option value="auth">登录/注册</option>
+      </select>
+    </span>
+    <span style="display:flex;align-items:center;gap:6px">
+      <label for="f-days">时间</label>
+      <select id="f-days">
+        <option value="1">今天</option>
+        <option value="7" selected>近 7 天</option>
+        <option value="30">近 30 天</option>
+      </select>
+    </span>
+    <span style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px">
+      <input id="f-keyword" type="text" placeholder="路径 / 动作关键词" autocomplete="off" style="flex:1">
+      <button class="act" id="btn-search">查询</button>
+      <button class="ghost" id="btn-reset">重置</button>
+    </span>
+  </div>
+
+  <div class="card">
+    <div class="hd"><b style="font-size:13px">记录</b>
+      <span class="hint" id="total"></span></div>
+    <div class="bd">
+      <table class="rtable">
+        <thead><tr><th>时间</th><th>用户</th><th>类型</th><th>动作 / 路径</th><th>参数</th><th>状态</th><th>IP / 设备</th><th>耗时</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="8" class="hint">加载中 …</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button class="ghost" id="btn-prev">上一页</button>
+      <span class="hint" id="page-info">–</span>
+      <button class="ghost" id="btn-next">下一页</button>
+    </div>
+  </div>
+
+  <p class="hint" style="margin-top:10px">
+    日志保留 30 天，每天 03:30 自动清理；只记录菜单/按钮和接口访问，不记录请求体（密码、验证码不会出现）。
+  </p>
+</main>
+
+<script>
+"use strict";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+const token = localStorage.getItem("token") || "";
+const state = { page: 1, pageSize: 50, total: 0 };
+
+function typeLabel(t) {
+  const label = { api: "接口", menu: "菜单", auth: "登录/注册" }[t] || t || "–";
+  const color = t === "auth" ? "var(--ok)" : t === "menu" ? "var(--warn)" : "var(--dim2)";
+  return `<span style="color:${color}">${esc(label)}</span>`;
+}
+
+function uaShort(ua) {
+  const s = String(ua || "");
+  if (!s) return "";
+  const dev = (s.match(/iPhone|iPad|Android|Windows|Macintosh|Linux/) || [""])[0];
+  const br = (s.match(/(?:Edg|Chrome|Firefox|Safari|MicroMessenger)[\/ ][\d.]+/) || [""])[0];
+  return [dev, br].filter(Boolean).join(" · ") || s.slice(0, 24);
+}
+
+async function apiGet(path) {
+  const r = await fetch(path, { headers: { Authorization: "Bearer " + token } });
+  const text = await r.text();
+  let body;
+  try { body = JSON.parse(text); } catch (e) { body = text; }
+  if (!r.ok) {
+    const detail = (body && body.detail) ? body.detail : ("HTTP " + r.status);
+    const err = new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    err.status = r.status;
+    throw err;
+  }
+  return body;
+}
+
+function useQueryParams() {
+  const q = new URLSearchParams(location.search);
+  const user = q.get("user") || q.get("username") || "";
+  if (user) $("#f-user").value = user;
+  const type = q.get("type") || q.get("action_type") || "";
+  if (["api", "menu", "auth"].includes(type)) $("#f-type").value = type;
+  const days = q.get("days") || "";
+  if (["1", "7", "30"].includes(days)) $("#f-days").value = days;
+  const kw = q.get("keyword") || "";
+  if (kw) $("#f-keyword").value = kw;
+}
+
+async function load(page) {
+  const p = Math.max(1, page || 1);
+  const qs = new URLSearchParams({ page: p, page_size: state.pageSize, days: $("#f-days").value || "7" });
+  const user = $("#f-user").value.trim();
+  const type = $("#f-type").value;
+  const kw = $("#f-keyword").value.trim();
+  if (user) qs.set("username", user);
+  if (type) qs.set("action_type", type);
+  if (kw) qs.set("keyword", kw);
+
+  const tb = $("#rows");
+  tb.innerHTML = `<tr><td colspan="8" class="hint">加载中 …</td></tr>`;
+  try {
+    const b = await apiGet("/api/audit/logs?" + qs.toString());
+    const items = b.items || [];
+    state.page = b.page || p;
+    state.total = b.total || 0;
+    tb.innerHTML = items.map(r => {
+      let act;
+      if (r.action_type === "api") {
+        act = `${esc(r.method || "")} <span class="hint">${esc(r.path || "")}</span>`;
+      } else {
+        act = `<b>${esc(r.action || "–")}</b> <span class="hint">${esc(r.path || "")}</span>`;
+      }
+      const st = r.status_code == null ? "–"
+        : `<span style="color:${r.status_code >= 400 ? "var(--bad)" : "var(--ok)"}">${r.status_code}</span>`;
+      const ua = r.ua
+        ? `<span class="hint" title="${esc(r.ua)}">${esc(uaShort(r.ua))}</span>` : "";
+      const dur = r.duration_ms == null ? "–" : `${r.duration_ms} ms`;
+      return `<tr>` +
+        `<td data-label="时间">${esc(r.created_at || "–")}</td>` +
+        `<td data-label="用户">${esc(r.username || r.user_id || "–")}</td>` +
+        `<td data-label="类型">${typeLabel(r.action_type)}</td>` +
+        `<td data-label="动作 / 路径">${act}</td>` +
+        `<td data-label="参数">${esc((r.query || "").slice(0, 200)) || "–"}</td>` +
+        `<td data-label="状态">${st}</td>` +
+        `<td data-label="IP / 设备">${esc(r.ip || "–")} ${ua}</td>` +
+        `<td data-label="耗时">${dur}</td>` +
+        `</tr>`;
+    }).join("") || `<tr><td colspan="8" class="hint">没有记录</td></tr>`;
+
+    const pages = Math.max(1, Math.ceil(state.total / state.pageSize));
+    $("#total").textContent = user ? `${user} · 共 ${state.total} 条` : `共 ${state.total} 条`;
+    document.title = (user ? user + " 的操作日志" : "用户操作日志") + " · AI Football";
+    $("#page-info").textContent = `第 ${state.page} / ${pages} 页`;
+    $("#btn-prev").disabled = state.page <= 1;
+    $("#btn-next").disabled = state.page >= pages;
+  } catch (e) {
+    if (e.status === 401) { location.replace("/login.html?v=7"); return; }
+    tb.innerHTML = `<tr><td colspan="8" style="color:var(--bad)">${esc(e.message)}</td></tr>`;
+  }
+}
+
+$("#btn-search").addEventListener("click", () => load(1));
+$("#btn-reset").addEventListener("click", () => {
+  $("#f-user").value = "";
+  $("#f-type").value = "";
+  $("#f-days").value = "7";
+  $("#f-keyword").value = "";
+  load(1);
+});
+$("#btn-prev").addEventListener("click", () => load(state.page - 1));
+$("#btn-next").addEventListener("click", () => load(state.page + 1));
+["f-user", "f-keyword"].forEach(id => {
+  $("#" + id).addEventListener("keydown", e => { if (e.key === "Enter") load(1); });
+});
+$("#f-type").addEventListener("change", () => load(1));
+$("#f-days").addEventListener("change", () => load(1));
+
+(async function boot() {
+  if (!token) { location.replace("/login.html?v=7"); return; }
+  try {
+    const me = await apiGet("/api/auth/me");
+    if (me.role !== "admin") {
+      document.querySelector("main").innerHTML =
+        `<div class="card"><div class="hd"><b>无权限</b></div>
+         <div style="padding:14px" class="hint">操作日志仅管理员可查看。</div></div>`;
+      return;
+    }
+    $("#who").textContent = "当前管理员：" + me.username;
+  } catch (e) {
+    if (e.status === 401) { location.replace("/login.html?v=7"); return; }
+    document.querySelector("main").innerHTML =
+      `<div class="card"><div style="padding:14px;color:var(--bad)">${esc(e.message)}</div></div>`;
+    return;
+  }
+  useQueryParams();
+  load(1);
+})();
+</script>
+</body>
+</html>

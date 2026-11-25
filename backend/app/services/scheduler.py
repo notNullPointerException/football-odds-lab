@@ -17,6 +17,7 @@ from app.services.odds_watch_service import odds_watch_job
 from app.services.sfc_archive_service import sfc_archive_job
 from app.services.sfc_history_service import sfc_result_sync_job
 from app.services.sfc_predict_service import sfc_predict_job
+from app.services.audit_service import audit_cleanup_job
 
 LIVE_INTERVAL_SECONDS = 2 * 60
 
@@ -91,6 +92,11 @@ _DEFAULT_TASKS = {
     "sfc_predict":      {"name": "胜负彩赛前预测(午间)", "start_hour": 11.75, "fn": sfc_predict_job,
                          "interval_seconds": None},
     "sfc_predict_eve":  {"name": "胜负彩赛前预测(晚间)", "start_hour": 19.75, "fn": sfc_predict_job,
+                         "interval_seconds": None},
+    # ── 用户操作日志清理 —— 2026-11-25 加 ──────────────────────────
+    # 保留 30 天。写日志时本来就有一次「每天最多一回」的兜底清理，这条是
+    # 明确的每日定时任务（03:30），保证没流量时也照常清。避开 02:00/02:30/03:00/04:00。
+    "audit_cleanup":    {"name": "操作日志清理", "start_hour": 3.5, "fn": audit_cleanup_job,
                          "interval_seconds": None},
 }
 

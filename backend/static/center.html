@@ -140,10 +140,10 @@ const $ = s => document.querySelector(s);
 
 async function loadUser() {
   const token = localStorage.getItem("token");
-  if (!token) { location.href = "/login.html?v=4"; return; }
+  if (!token) { location.href = "/login.html?v=7"; return; }
   try {
     const r = await fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } });
-    if (!r.ok) { location.href = "/login.html?v=4"; return; }
+    if (!r.ok) { location.href = "/login.html?v=7"; return; }
     const me = await r.json();
     $("#uc-username").textContent = me.username || "-";
     $("#uc-role").textContent = me.role || "-";
@@ -177,7 +177,7 @@ async function loadUser() {
       }
     }
   } catch(e) {
-    location.href = "/login.html?v=4";
+    location.href = "/login.html?v=7";
   }
 }
 
@@ -252,7 +252,7 @@ $("#btn-recharge").onclick = () => {
       });
       if (r.status === 401) {
         localStorage.removeItem("token");
-        location.href = "/login.html?v=4";
+        location.href = "/login.html?v=7";
       }
     } catch (e) {}
   }, 10 * 60 * 1000);

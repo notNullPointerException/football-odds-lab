@@ -20,6 +20,7 @@ from app.services.odds_watch_service import odds_watch_job
 from app.services.sfc_archive_service import sfc_archive_job
 from app.services.sfc_history_service import sfc_result_sync_job
 from app.services.sfc_predict_service import sfc_predict_job
+from app.services.audit_service import audit_cleanup_job
 
 router = APIRouter()
 
@@ -42,6 +43,7 @@ TASK_MAP = {
     "sfc_archive_eve": ("胜负彩存档(晚间)", sfc_archive_job),
     "sfc_predict":     ("胜负彩赛前预测(午间)", sfc_predict_job),
     "sfc_predict_eve": ("胜负彩赛前预测(晚间)", sfc_predict_job),
+    "audit_cleanup":   ("操作日志清理", audit_cleanup_job),
 }
 
 

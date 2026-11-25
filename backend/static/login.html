@@ -132,6 +132,48 @@ input:focus { border-color: #4a9eff; }
 .eye .eye-off { display: none; }
 .eye.on .eye-on { display: none; }
 .eye.on .eye-off { display: block; }
+/* 保持登录：网页没有系统密码管理器，靠长期 token 免密，不是存密码 */
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: #8b93a5;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.remember input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 4px;
+  background: rgba(255,255,255,.06);
+  position: relative;
+  cursor: pointer;
+}
+.remember input[type="checkbox"]:checked {
+  background: #4a9eff;
+  border-color: #4a9eff;
+}
+.remember input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.remember .tip { margin-left: auto; color: #6b7383; font-size: 12px; }
 .btn {
   width: 100%;
   padding: 12px;
@@ -205,6 +247,11 @@ input:focus { border-color: #4a9eff; }
              autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
       <img id="login-captcha-img" title="点击刷新">
     </div>
+    <label class="remember" for="login-remember">
+      <input type="checkbox" id="login-remember" checked>
+      <span>保持登录</span>
+      <span class="tip">30 天内免密码</span>
+    </label>
     <button class="btn" id="btn-login">登录</button>
     <p class="msg" id="login-msg"></p>
   </div>
@@ -238,6 +285,17 @@ input:focus { border-color: #4a9eff; }
     </div>
     <button class="btn" id="btn-register">注册</button>
     <p class="msg" id="reg-msg"></p>
+  </div>
+</div>
+
+<!-- 登录成功后的「记住账号密码？」确认（等价于浏览器的保存密码弹窗） -->
+<div id="remember-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:110;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#1e222b;border-radius:14px;padding:24px;max-width:340px;width:100%;color:#e6e9ef;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <h3 style="font-size:17px;margin-bottom:18px;font-weight:600;">记住账号密码？</h3>
+    <div style="display:flex;gap:10px;">
+      <button id="remember-no" style="flex:1;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:none;color:#8b93a5;font-size:14px;cursor:pointer;">不记住</button>
+      <button id="remember-yes" style="flex:1;padding:11px;border-radius:8px;border:0;background:#4a9eff;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">记住</button>
+    </div>
   </div>
 </div>
 
@@ -330,11 +388,60 @@ bindPassToggle("login-pass", "toggle-login-pass");
 bindPassToggle("reg-pass", "toggle-reg-pass");
 bindPassToggle("reg-pass2", "toggle-reg-pass2");
 
+// ── 本机记住账号密码 ─────────────────────────────────────────
+// 浏览器（尤其微信内置浏览器）不会让网页自己弹「保存密码？」，也没有密码管理器。
+// 别人手机端的「记住密码」大多是站点自己存：登录成功后问一次，存在本机，
+// 下次进登录页直接填好账号密码。这里照这个做法实现。
+// ⚠️ base64 只是不让密码以明文肉眼可见，不是加密。
+// 服务端仍然只存 bcrypt 哈希，这里只是浏览器本地的一份。
+const SAVED_LOGIN_KEY = "saved_login";
+function b64e(s) {
+  let bin = "";
+  new TextEncoder().encode(s).forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+function b64d(s) {
+  return new TextDecoder().decode(Uint8Array.from(atob(s), c => c.charCodeAt(0)));
+}
+function loadSavedLogin() {
+  try {
+    const o = JSON.parse(localStorage.getItem(SAVED_LOGIN_KEY) || "null");
+    return o && o.u && o.p ? { u: o.u, p: b64d(o.p) } : null;
+  } catch (e) { return null; }
+}
+function saveLogin(u, p) {
+  localStorage.setItem(SAVED_LOGIN_KEY, JSON.stringify({ u, p: b64e(p) }));
+}
+function clearSavedLogin() {
+  localStorage.removeItem(SAVED_LOGIN_KEY);
+}
+function askRememberLogin(u, p) {
+  const modal = $("#remember-modal");
+  if (!modal) { location.href = "/"; return; }
+  $("#remember-yes").onclick = () => { saveLogin(u, p); location.href = "/"; };
+  $("#remember-no").onclick = () => { clearSavedLogin(); location.href = "/"; };
+  modal.style.display = "flex";
+}
+(function initSavedLogin() {
+  const saved = loadSavedLogin();
+  if (saved) {
+    $("#login-user").value = saved.u;
+    $("#login-pass").value = saved.p;
+  } else {
+    // 没存密码时至少带回上次的用户名
+    const savedUser = localStorage.getItem("last_user");
+    if (savedUser) $("#login-user").value = savedUser;
+  }
+  if (localStorage.getItem("login_remember") === "0") {
+    $("#login-remember").checked = false;
+  }
+})();
 $("#btn-login").onclick = async () => {
   const u = stripInvisible(halfWidth($("#login-user").value)).trim();
   const p = stripInvisible($("#login-pass").value);
   const ccode = halfWidth($("#login-captcha")?.value || "").trim();
   const cid = $("#login-captcha-img")?.dataset.cid || "";
+  const remember = !!$("#login-remember")?.checked;
   const msg = $("#login-msg");
   if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
   if (passwordNeedsRetry(p)) {
@@ -345,12 +452,19 @@ $("#btn-login").onclick = async () => {
   const r = await fetch("/api/auth/login", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username: u, password: p, captcha_id: cid, captcha_code: ccode})
+    body: JSON.stringify({username: u, password: p, captcha_id: cid, captcha_code: ccode, remember})
   });
   const d = await r.json();
   if (r.ok) {
     localStorage.setItem("token", d.token);
-    location.href = "/";
+    localStorage.setItem("last_user", u);
+    localStorage.setItem("login_remember", remember ? "1" : "0");
+    const saved = loadSavedLogin();
+    if (saved && saved.u === u && saved.p === p) {
+      location.href = "/";          // 账号密码没变，不再重复问
+    } else {
+      askRememberLogin(u, p);       // 第一次/换了账号：问一次「记住密码？」
+    }
   } else {
     // 401 时把「实际发出去的东西」亮出来：用户名原样回显；密码只报长度和首尾字符
     // （粘贴常丢开头/结尾各一位，肉眼看圆点看不出来）。内容本身不回显，要看点眼睛。
@@ -360,6 +474,8 @@ $("#btn-login").onclick = async () => {
       const first = p ? JSON.stringify(p[0]) : '""';
       const last = p ? JSON.stringify(p[p.length - 1]) : '""';
       diag = `（用户名：${u}；密码 ${p.length} 位，首字符 ${first}，尾字符 ${last}${odd ? `，含 ${odd} 个非 ASCII` : ""}）`;
+      const savedNow = loadSavedLogin();
+      if (savedNow && savedNow.u === u) diag += "；记住的旧密码可能已失效，请重新输入密码";
     }
     msg.textContent = (d.detail || "登录失败") + diag;
     document.getElementById("login-captcha").value = "";

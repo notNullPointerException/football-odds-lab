@@ -1,4 +1,5 @@
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,7 +18,10 @@ from app.api.scheduler import router as scheduler_router
 from app.api.predictions import router as predictions_router
 from app.api.jc import router as jc_router
 from app.api.sfc import router as sfc_router
-from app.api.auth import router as auth_router, touch_token
+from app.api.auth import router as auth_router, touch_token, get_user_id_from_token
+from app.api.audit import router as audit_router
+from app.core.rate_limit import client_ip
+from app.services.audit_service import log_action, sanitize_query
 from app.services.scheduler import init_scheduler, shutdown_scheduler
 
 # 初始化日志
@@ -111,6 +115,54 @@ async def sliding_session(request, call_next):
             pass
     return await call_next(request)
 
+
+# 记录已登录用户的 API 操作。只记方法/路径/查询参数，**不读请求体**，
+# 密码和验证码不会进日志。静态文件、心跳、验证码、点击上报本身都跳过
+# （点击由端点自己写一条 menu 记录，避免双份）。
+# 管理页只有 admin 能操作，其动作不需要记（用户 2026-11-25 要求）：
+# 用户管理（/api/auth/admin/*）、开通/续费、查操作日志都不进审计。
+_AUDIT_SKIP_PATHS = {
+    "/api/health",
+    "/api/auth/me",
+    "/api/auth/captcha",
+    "/api/audit/click",
+    "/api/audit/logs",
+    "/api/auth/activate",
+}
+_AUDIT_SKIP_PREFIXES = ("/api/auth/admin/",)
+
+
+@app.middleware("http")
+async def audit_user_actions(request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    try:
+        path = request.url.path
+        if (request.method != "OPTIONS"
+                and path.startswith("/api/")
+                and path not in _AUDIT_SKIP_PATHS
+                and not path.startswith(_AUDIT_SKIP_PREFIXES)):
+            authorization = request.headers.get("authorization") or ""
+            if authorization.startswith("Bearer "):
+                uid = await asyncio.to_thread(get_user_id_from_token, authorization[7:])
+                if uid:
+                    log_action(
+                        user_id=uid,
+                        action_type="api",
+                        method=request.method,
+                        path=path,
+                        query=sanitize_query(request.url.query),
+                        status_code=response.status_code,
+                        ip=client_ip(request),
+                        ua=request.headers.get("user-agent", "")[:512],
+                        duration_ms=int((time.perf_counter() - started) * 1000),
+                    )
+    except Exception as e:
+        # 审计失败不能影响正常请求
+        logger.warning(f"[audit] 中间件记录失败: {e}")
+    return response
+
+
 # 注册路由
 app.include_router(leagues_router, prefix="/api", tags=["Leagues"])
 app.include_router(teams_router, prefix="/api", tags=["Teams"])
@@ -122,6 +174,7 @@ app.include_router(predictions_router, prefix="/api", tags=["Predictions"])
 app.include_router(jc_router, prefix="/api", tags=["JC"])
 app.include_router(sfc_router, prefix="/api", tags=["SFC"])
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
+app.include_router(audit_router, prefix="/api", tags=["Audit"])
 
 
 @app.get("/api/health")

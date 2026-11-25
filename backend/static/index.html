@@ -384,14 +384,14 @@
     const icon = document.getElementById("btn-user-icon");
     if (icon) {
       icon.onclick = () => {
-        location.href = "/login.html?v=4";
+        location.href = "/login.html?v=7";
       };
     }
     // 个人中心里的登录按钮也跳独立页
     const ucLogin = document.getElementById("uc-to-login");
-    if (ucLogin) ucLogin.onclick = () => location.href = "/login.html?v=4";
+    if (ucLogin) ucLogin.onclick = () => location.href = "/login.html?v=7";
     const ucReg = document.getElementById("uc-to-register");
-    if (ucReg) ucReg.onclick = () => location.href = "/login.html?v=4#register";
+    if (ucReg) ucReg.onclick = () => location.href = "/login.html?v=7#register";
   });
 })();
 </script>
@@ -400,7 +400,7 @@
 <script>
 // 会话失效检查：页面加载时 + 接口 401 时跳转登录页
 (function(){
-  const LOGIN = "/login.html?v=4";
+  const LOGIN = "/login.html?v=7";
   async function checkSession() {
     const token = localStorage.getItem("token");
     if (!token) return false;
@@ -506,7 +506,7 @@
       </div>
       <div class="hero-cta" data-hero-cta>
         <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
-        <a class="go" data-hero-cta-link href="/login.html?v=4#register">注册 / 开通会员</a>
+        <a class="go" data-hero-cta-link href="/login.html?v=7#register">注册 / 开通会员</a>
       </div>
     </div>
     <div class="bar">
@@ -545,7 +545,7 @@
       </div>
       <div class="hero-cta" data-hero-cta>
         <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
-        <a class="go" data-hero-cta-link href="/login.html?v=4#register">注册 / 开通会员</a>
+        <a class="go" data-hero-cta-link href="/login.html?v=7#register">注册 / 开通会员</a>
       </div>
     </div>
     <div class="bar">
@@ -593,7 +593,7 @@
       </div>
       <div class="hero-cta" data-hero-cta>
         <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
-        <a class="go" data-hero-cta-link href="/login.html?v=4#register">注册 / 开通会员</a>
+        <a class="go" data-hero-cta-link href="/login.html?v=7#register">注册 / 开通会员</a>
       </div>
     </div>
     <div class="bar">
@@ -648,7 +648,8 @@
     </div>
     <div class="card">
       <div class="hd"><b style="font-size:13px">用户列表</b>
-        <span class="hint" id="adm-total"></span></div>
+        <span class="hint" id="adm-total"></span>
+        <button class="ghost" id="open-audit" style="margin-left:auto">全部操作日志</button></div>
       <div class="bd" style="padding:0;overflow:auto">
         <table class="rtable">
           <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>状态</th><th>会员</th><th>到期时间</th><th>操作</th></tr></thead>
@@ -656,6 +657,7 @@
         </table>
       </div>
     </div>
+
     <p class="hint" style="margin-top:10px">
       开通规则：非会员从今天起算；未到期的会员从现有到期日往后顺延，不吞剩余天数。
     </p>
@@ -671,6 +673,30 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+/* 用户行为上报：只上报菜单/按钮名，不带页面内容。未登录或失败都静默忽略。 */
+function trackClick(name) {
+  const token = localStorage.getItem("token");
+  if (!token || !name) return;
+  try {
+    fetch("/api/audit/click", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ name, page: (location.pathname + location.search).slice(0, 255) }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (e) { /* 上报失败不影响操作 */ }
+}
+window.trackClick = trackClick;
+
+/* 通用按钮点击上报：除了顶部菜单（已单独上报）和管理页（避免日志查询把自己刷屏），
+   其余按钮都记一条，文字过长截断。 */
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if (!b || b.closest("nav") || b.closest("#tab-admin")) return;
+  const name = (b.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60);
+  if (name) trackClick("按钮：" + name);
+});
 
 /* 体彩给的都是北京时间字符串（"2026-09-18 22:00:00"），本机 TZ 就是 Asia/Shanghai，
    所以直接按本地时间解析即可。解析不出来返回 null，调用方据此降级而不是显示 NaN。 */
@@ -849,6 +875,17 @@ async function api(path, opts) {
 }
 
 function showNet(txt) { $("#net").textContent = txt; }
+
+/* 服务端的会员拦截：403 + require_member 的两句文案。
+   页面一直开着时会员可能在任何一次请求之间到期（比如 14 场批量跑到一半），
+   点击时的 ensureMember 检查不到这种「两次点击之间」的到期，只能靠把 403 翻译回
+   和点击时一致的续费弹框。返回 "expired" / "open" / ""。 */
+function memberGateKind(e) {
+  if (!e || e.status !== 403 || typeof e.detail !== "string") return "";
+  if (e.detail.indexOf("会员已到期") === 0) return "expired";
+  if (e.detail.indexOf("该功能需要会员") === 0) return "open";
+  return "";
+}
 
 /* ---------------- 两个接口返回结构的归一化 ----------------
    /api/predict/{id}  -> 扁平 {win_home,.., top3, llm:{}, model_group}
@@ -1029,10 +1066,6 @@ function renderRecord(d, opts = {}) {
           ? `<div class="prose"><b>深度分析</b>${esc(l.deep_report)}</div>` : ""}
       </div>
     </div>
-
-    ${opts.raw !== undefined
-      ? `<details><summary>原始 JSON 返回</summary><pre>${esc(JSON.stringify(opts.raw, null, 2))}</pre></details>`
-      : ""}
   `;
 
   const head = opts.collapsible
@@ -1063,7 +1096,10 @@ function switchTab(name) {
     if (window.loadAdminUsers) window.loadAdminUsers();
   }
 }
-$$("nav button").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+$$("nav button").forEach(b => b.onclick = () => {
+  trackClick("菜单：" + b.textContent.trim());
+  switchTab(b.dataset.tab);
+});
 
 // 把某个 fixture 载入预测页（体彩页和预测历史页共用）
 function loadIntoPredict(fid) {
@@ -1915,7 +1951,7 @@ $("#sfc-archive").onclick = async () => {
 async function runOneSfcPredict(fid) {
   const token = localStorage.getItem("token");
   if (!token) {
-    location.href = "/login.html?v=4";
+    location.href = "/login.html?v=7";
     return false;
   }
   const at = "跑于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -1956,6 +1992,9 @@ async function rerunOneSfc(fid) {
     await loadSfc(true);
   } else {
     patchSfcPred(fid);
+    // 点击检查之后、请求到达之前会员正好到期：服务端 403，这里补上续费弹框
+    const kind = memberGateKind(sfc.st[fid]);
+    if (kind) showPayModal(kind);
   }
 }
 
@@ -1973,7 +2012,7 @@ async function runSfcPredict() {
   // 未登录提示，不跳转
   const token = localStorage.getItem("token");
   if (!token) {
-    location.href = "/login.html?v=4";
+    location.href = "/login.html?v=7";
     return;
   }
   // 先弹窗提示
@@ -2027,6 +2066,11 @@ async function doSfcPredict() {
     // 失败的【留着】，不然一刷新就变回「未跑」，看不出是哪几场没跑成。
     fids.forEach(fid => { if (!(sfc.st[fid] instanceof Error)) delete sfc.st[fid]; });
 
+    // 会员在批量跑到一半到期：剩下的场次服务端全部 403（在调用 LLM 之前就拦掉，不花钱），
+    // 但格子上只会显示「跑失败」。这里统一弹一次续费框，别让用户对着 14 个红字猜原因。
+    const gateKind = fids.map(fid => memberGateKind(sfc.st[fid])).find(Boolean);
+    if (gateKind) showPayModal(gateKind);
+
     // 全部跑完再拉一次接口：庄家盘 / 体彩盘 / 水 也顺便跟着刷新，at 换回后端的 updated_at
     btn.textContent = "刷新中…";
     await loadSfc(true);
@@ -2077,7 +2121,7 @@ async function runPredict() {
   btn.disabled = true;
   const t0 = performance.now();
   out.innerHTML = `<div class="loading">
-      正在预测 fixture <span class="num">${fid}</span> …
+      正在预测中 …
       <span class="num" id="el">0</span>s
       <br><small>XGB 特征 → 伤停/首发（实时 API）→ DeepSeek LLM</small>
     </div>`;
@@ -2095,14 +2139,14 @@ async function runPredict() {
     const fixture = await fixtureP;
     const rec = normalizePredict(res.body.result, fixture);
 
-    const secs = ((performance.now() - t0) / 1000).toFixed(1);
     showNet(`POST /api/predict/${fid} · ${res.status} · ${res.ms}ms`);
-    out.innerHTML = renderRecord(rec, { raw: res.body });
-    out.insertAdjacentHTML("beforeend",
-      `<div class="hint" style="margin-top:8px">服务端耗时 ${secs}s · 已写入 predictions 表</div>`);
+    out.innerHTML = renderRecord(rec);
   } catch (e) {
     showNet(`POST /api/predict/${fid} · 失败`);
     out.innerHTML = `<div class="err">预测失败\n${esc(e.message)}</div>`;
+    // 点击检查之后、请求到达之前会员到期：补上续费弹框，别只留一行 HTTP 403
+    const kind = memberGateKind(e);
+    if (kind) showPayModal(kind);
   } finally {
     clearInterval(ticker);
     predicting = false;
@@ -2190,7 +2234,7 @@ async function loadHistory(page) {
     // 401=没登录（历史现在要求登录，免费注册即可看）；403=没会员（如后续收紧）
     if (e.status === 401) {
       out.innerHTML = `<div class="empty">登录后可查看预测记录<br>
-        <a href="/login.html?v=4">去登录</a> · <a href="/login.html?v=4#register">免费注册</a></div>`;
+        <a href="/login.html?v=7">去登录</a> · <a href="/login.html?v=7#register">免费注册</a></div>`;
     } else if (e.status === 403) {
       out.innerHTML = `<div class="empty">开通会员后可查看预测记录<br>
         <a href="/center.html">去个人中心开通</a></div>`;
@@ -2264,7 +2308,7 @@ async function loadSfcHistory(seq) {
     if (seq !== historySeq) return;
     if (e.status === 401) {
       out.innerHTML = `<div class="empty">登录后可查看胜负彩复盘<br>
-        <a href="/login.html?v=4">去登录</a> · <a href="/login.html?v=4#register">免费注册</a></div>`;
+        <a href="/login.html?v=7">去登录</a> · <a href="/login.html?v=7#register">免费注册</a></div>`;
     } else {
       out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
     }
@@ -2577,18 +2621,35 @@ window.checkAuth = async function checkAuth() {
   return null;
 }
 function requireLogin() {
-  location.href = "/login.html?v=4";
+  location.href = "/login.html?v=7";
   return false;
 }
-function showPayModal() {
+/* kind: "expired" = 开过会员但已到期，需续费；"open" = 从未开通；空 = 通用支付框 */
+function showPayModal(kind) {
+  const title = document.getElementById("pay-title");
+  const hint = document.getElementById("pay-hint");
+  if (kind === "expired") {
+    if (title) title.textContent = "会员已到期";
+    if (hint) hint.textContent = "你的会员已到期，续费后即可继续使用 AI 预测和胜负彩 14 场预测。";
+  } else if (kind === "open") {
+    if (title) title.textContent = "开通会员";
+    if (hint) hint.textContent = "开通会员后即可使用 AI 预测和胜负彩 14 场预测。";
+  } else {
+    if (title) title.textContent = "请扫码支付";
+    if (hint) hint.textContent = "";
+  }
   document.getElementById("pay-modal").style.display = "flex";
 }
 /* 预测类功能的统一门槛：没登录 → 登录框；登录了但没会员 → 支付框。
+   expires_at 有值说明开过会员（周卡/月卡等），已经过期就提示续费，而不是只说「请扫码支付」。
    返回 me 表示放行，返回 null 表示已弹窗拦截。 */
 window.ensureMember = async function ensureMember() {
   const me = await checkAuth();
   if (!me) { requireLogin(); return null; }
-  if (!me.is_member) { showPayModal(); return null; }
+  if (!me.is_member) {
+    showPayModal(me.expires_at ? "expired" : "open");
+    return null;
+  }
   return me;
 };
 
@@ -2611,9 +2672,11 @@ window.loadAdminUsers = async function loadAdminUsers() {
       const member = u.is_member
         ? `<span style="color:var(--ok)">会员</span>`
         : `<span style="color:var(--dim2)">非会员</span>`;
+      // admin 自己不需要「操作日志」按钮（用户 2026-11-25 要求）
+      const auditBtn = `<button class="ghost" data-audit="${esc(u.username)}">操作日志</button>`;
       const action = u.role === "admin"
-        ? `<span class="hint">–</span>`
-        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button> <button class="ghost" data-reset="${u.id}" data-name="${esc(u.username)}">重置密码</button>`;
+        ? "—"
+        : `<button class="ghost" data-toggle="${u.id}" data-name="${esc(u.username)}">${u.is_active ? "禁用" : "启用"}</button> <button class="ghost" data-reset="${u.id}" data-name="${esc(u.username)}">重置密码</button> ${auditBtn}`;
       return `<tr><td data-label="ID">${u.id}</td><td data-label="用户名">${esc(u.username)}</td><td data-label="角色">${esc(u.role)}</td>` +
         `<td data-label="状态">${u.is_active ? "正常" : `<span style="color:var(--bad)">已禁用</span>`}</td>` +
         `<td data-label="会员">${member}</td><td data-label="到期时间">${exp}</td><td data-label="操作">${action}</td></tr>`;
@@ -2622,6 +2685,16 @@ window.loadAdminUsers = async function loadAdminUsers() {
     tb.innerHTML = `<tr><td colspan="7" style="color:var(--bad)">${esc(e.message)}</td></tr>`;
   }
 };
+
+/* ---------------- 用户操作日志（独立页面） ----------------
+   日志是宽表 + 长列表，塞在管理页底部要来回滚动；改成点按钮在新页面打开，
+   页面只干这一件事。带 ?user= 即按该用户查（30 天保留期内全部记录）。 */
+function openAudit(username) {
+  const url = "/audit.html" + (username ? "?user=" + encodeURIComponent(username) : "");
+  const w = window.open(url, "_blank");
+  if (!w) location.href = url;   // 弹窗被拦截时退回本页跳转
+}
+document.getElementById("open-audit")?.addEventListener("click", () => openAudit(""));
 
 document.getElementById("adm-open")?.addEventListener("click", async () => {
   const name = document.getElementById("adm-username").value.trim();
@@ -2652,6 +2725,12 @@ document.getElementById("adm-users")?.addEventListener("click", async ev => {
     showModal("操作失败：" + (e.detail || e.message));
   }
 });
+// 用户列表里的「操作日志」：新页面按该用户名查全部记录（30 天保留期内）
+document.getElementById("adm-users")?.addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-audit]");
+  if (!b) return;
+  openAudit(b.dataset.audit || "");
+});
 // window.refreshAdminEntry(); // removed
 document.getElementById("btn-close-pay")?.addEventListener("click", () => {
   document.getElementById("pay-modal").style.display = "none";
@@ -2660,15 +2739,15 @@ document.getElementById("btn-close-login").onclick = () => {
   document.getElementById("login-modal").style.display = "none";
 };
 document.getElementById("btn-login").onclick = () => {
-  location.href = "/login.html?v=4";
+  location.href = "/login.html?v=7";
 };
 // login-page 那套没有配套的登录逻辑（登录要验证码），登录按钮统一指到 /login.html。
 // 注意：#login-page 的 DOM 在这段脚本之后才解析，必须用事件委托，不能直接 getElementById
 document.addEventListener("click", ev => {
-  if (ev.target.closest("#btn-do-login")) location.href = "/login.html?v=4";
+  if (ev.target.closest("#btn-do-login")) location.href = "/login.html?v=7";
 });
 document.getElementById("btn-register").onclick = () => {
-  location.href = "/login.html?v=4#register";
+  location.href = "/login.html?v=7#register";
 };
 
 // 拦截需要登录的按钮
@@ -2752,7 +2831,8 @@ setInterval(loadTicker, 5 * 60 * 1000);
 
 <div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:110;align-items:center;justify-content:center;">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:320px;max-width:calc(100vw - 32px);text-align:center;">
-    <h3 style="margin:0 0 12px">请扫码支付</h3>
+    <h3 id="pay-title" style="margin:0 0 12px">请扫码支付</h3>
+    <p id="pay-hint" style="margin:0 0 12px;font-size:13px;color:var(--dim);line-height:1.6"></p>
 
 <div id="recharge-ticker" style="height:28px;overflow:hidden;background:rgba(74,158,255,.1);border-radius:6px;margin-bottom:12px;font-size:12px;line-height:28px;padding:0 8px;color:var(--dim);">
   <div id="ticker-inner" style="white-space:nowrap;animation:ticker 20s linear infinite;"></div>
@@ -2998,7 +3078,7 @@ async function refreshUserIcon() {
       if (a) { a.textContent = "开通会员"; a.href = "/center.html"; }
       if (txt) txt.textContent = "已登录；开通会员后即可运行完整预测、保存赛前快照并查看赛后复盘。";
     } else {
-      if (a) { a.textContent = "注册 / 开通会员"; a.href = "/login.html?v=4#register"; }
+      if (a) { a.textContent = "注册 / 开通会员"; a.href = "/login.html?v=7#register"; }
       if (txt) txt.textContent = "游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。";
     }
   });
@@ -3021,7 +3101,7 @@ document.getElementById("dd-center")?.addEventListener("click", () => {
 });
 document.getElementById("dd-logout")?.addEventListener("click", () => {
   localStorage.removeItem("token");
-  location.href = "/login.html?v=4";
+  location.href = "/login.html?v=7";
 });
 
 // 确保个人中心按钮可点
@@ -3212,7 +3292,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
   if(logout){
     logout.onclick = function(){
       localStorage.removeItem("token");
-      location.href = "/login.html?v=4";
+      location.href = "/login.html?v=7";
     };
   }
 })();
@@ -3234,7 +3314,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
       try {
         if(token) await fetch("/api/auth/logout", {method:"POST", headers:{Authorization:"Bearer "+token}});
       } catch(e) {}
-      location.href = "/login.html?v=4";
+      location.href = "/login.html?v=7";
     };
   }
   // also check periodically in case token changes
@@ -3289,7 +3369,7 @@ document.addEventListener("click", async function(e) {
   btn.dataset.busy = "1";
   const token = localStorage.getItem("token");
   if (!token) {
-    location.href = "/login.html?v=4";
+    location.href = "/login.html?v=7";
     return;
   }
   // 检查会员状态
@@ -3310,13 +3390,16 @@ document.addEventListener("click", async function(e) {
 });
 
 /* 体彩页的「预测比赛」结果就地展开在本行下方，不跳预测页。
-   同屏只留一张：再点别的场次会先收掉上一张，避免 10 场比赛堆 10 张卡。 */
+   各场结果互不干扰：点别的场次不会收掉已经展开的结果，由用户点「收起」自己关；
+   同一场重复预测就复用本行（只换内容），不会叠出第二张。 */
 function showJcInline(tr, html) {
-  document.querySelectorAll("#jc-out tr.jc-inline").forEach(r => r.remove());
-  const row = document.createElement("tr");
-  row.className = "jc-inline";
+  let row = tr.nextElementSibling;
+  if (!row || !row.classList.contains("jc-inline")) {
+    row = document.createElement("tr");
+    row.className = "jc-inline";
+    tr.parentNode.insertBefore(row, tr.nextSibling);
+  }
   row.innerHTML = `<td colspan="6">${html}</td>`;
-  tr.parentNode.insertBefore(row, tr.nextSibling);
   return row;
 }
 
@@ -3325,8 +3408,7 @@ async function doPredict(btn, fid) {
   if (btn.dataset.running === "1") return;
   btn.dataset.running = "1";
   const tr = btn.closest("tr");
-  const row = tr ? showJcInline(tr,
-    `<div class="loading">正在预测 fixture <span class="num">${esc(fid)}</span> …</div>`) : null;
+  const row = tr ? showJcInline(tr, `<div class="loading">正在预测中 …</div>`) : null;
   try {
     // 队名/联赛等信息在 fixture 接口，预测接口只回数字
     const fixtureP = api(`/api/fixtures/${fid}`)
@@ -3340,8 +3422,7 @@ async function doPredict(btn, fid) {
         `<div style="display:flex;justify-content:flex-end;margin-bottom:6px">
            <button class="ghost" type="button" data-inline-close>收起</button>
          </div>` +
-        renderRecord(rec, { raw: res.body }) +
-        `<div class="hint" style="margin-top:8px">已写入 predictions 表</div>`;
+        renderRecord(rec);
       row.querySelector("[data-inline-close]").onclick = () => row.remove();
       row.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
@@ -3353,7 +3434,10 @@ async function doPredict(btn, fid) {
       row.querySelector("td").innerHTML =
         `<div class="err">预测失败\n${esc(msg)}</div>`;
     }
-    showModal(msg);
+    // 会员在「点击检查」和「请求到达」之间到期：服务端 403，弹续费框而不是通用提示框
+    const gate = memberGateKind(err);
+    if (gate) showPayModal(gate);
+    else showModal(msg);
   } finally {
     delete btn.dataset.running;
     delete btn.dataset.busy;
@@ -3488,7 +3572,10 @@ document.getElementById("adm-users")?.addEventListener("click", ev => {
     });
     // Rebind click handlers
     nav.querySelectorAll("button[data-tab]").forEach(b => {
-      b.onclick = () => switchTab(b.dataset.tab);
+      b.onclick = () => {
+        trackClick("菜单：" + b.textContent.trim());
+        switchTab(b.dataset.tab);
+      };
     });
   } catch(e) { console.error("load menus failed", e); }
 })();
