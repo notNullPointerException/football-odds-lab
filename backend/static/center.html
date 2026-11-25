@@ -119,7 +119,6 @@ select {
     <a href="/" style="position:absolute;top:12px;right:16px;font-size:20px;color:#8b93a5;text-decoration:none;">✕</a>
     <h2>账户信息</h2>
     <div class="info-row"><span class="label">用户</span><span class="value" id="uc-username">-</span></div>
-    <div class="info-row"><span class="label">角色</span><span class="value" id="uc-role">-</span></div>
     <div class="info-row"><span class="label">到期</span><span class="value" id="uc-expires">-</span></div>
   </div>
 
@@ -133,6 +132,20 @@ select {
     </select>
     <button class="btn" id="btn-recharge">确认充值</button>
   </div>
+
+</div>
+
+<!-- 支付弹窗：必须先选套餐再扫码，否则管理员收到钱也不知道该开多久。
+     弹窗里写明「套餐 + 金额 + 用户名」，用户付款时照着备注即可。 -->
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;">
+  <div class="card" style="width:340px;max-width:calc(100vw - 32px);margin:0;padding:22px;text-align:center;">
+    <h2 id="pay-title" style="margin-bottom:6px;">扫码支付</h2>
+    <p id="pay-plan" style="color:#8b93a5;font-size:14px;line-height:1.6;margin-bottom:10px;"></p>
+    <img id="pay-qr" src="/alipay-qr.png?v=2" alt="支付宝收款码"
+         style="width:220px;height:220px;background:#333;border-radius:8px;">
+    <p id="pay-tip" style="color:#8b93a5;font-size:13px;line-height:1.7;margin-top:12px;"></p>
+    <button class="btn" id="pay-close" style="margin-top:12px;">我已支付，关闭</button>
+  </div>
 </div>
 
 <script>
@@ -140,13 +153,12 @@ const $ = s => document.querySelector(s);
 
 async function loadUser() {
   const token = localStorage.getItem("token");
-  if (!token) { location.href = "/login.html?v=7"; return; }
+  if (!token) { location.href = "/login.html?v=11"; return; }
   try {
     const r = await fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } });
-    if (!r.ok) { location.href = "/login.html?v=7"; return; }
+    if (!r.ok) { location.href = "/login.html?v=11"; return; }
     const me = await r.json();
     $("#uc-username").textContent = me.username || "-";
-    $("#uc-role").textContent = me.role || "-";
     const expEl = $("#uc-expires");
     if (me.role === "admin") {
       expEl.textContent = "无限制";
@@ -177,7 +189,7 @@ async function loadUser() {
       }
     }
   } catch(e) {
-    location.href = "/login.html?v=7";
+    location.href = "/login.html?v=11";
   }
 }
 
@@ -231,11 +243,30 @@ function showNextTicker() {
   }, 12000);
 }
 
-$("#btn-recharge").onclick = () => {
-  const plan = $("#recharge-plan").value;
-  alert("请扫码支付后联系管理员激活（套餐：" + plan + "）");
-  // TODO: 跳转到支付页或弹出二维码
+const PLANS = {
+  week:    { name: "周卡", price: 188 },
+  month:   { name: "月卡", price: 588 },
+  quarter: { name: "季卡", price: 1488 },
+  year:    { name: "年卡", price: 4888 },
 };
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+$("#btn-recharge").onclick = () => {
+  const plan = PLANS[$("#recharge-plan").value] || { name: $("#recharge-plan").value, price: "" };
+  const user = $("#uc-username").textContent.trim();
+  $("#pay-plan").textContent = `套餐：${plan.name} · ¥${plan.price}`;
+  $("#pay-tip").innerHTML =
+    `支付时请备注用户名 <b style="color:#e6e9ef">${escHtml(user)}</b> 和「${plan.name}」，<br>` +
+    `支付后联系管理员为您开通。`;
+  $("#pay-modal").style.display = "flex";
+};
+
+$("#pay-close").onclick = () => { $("#pay-modal").style.display = "none"; };
 
 // ── 页面心跳保活：页面开着就算在线 ──
 // 与首页同一套逻辑：每 10 分钟带 token 打一次 /api/auth/me，
@@ -252,7 +283,7 @@ $("#btn-recharge").onclick = () => {
       });
       if (r.status === 401) {
         localStorage.removeItem("token");
-        location.href = "/login.html?v=7";
+        location.href = "/login.html?v=11";
       }
     } catch (e) {}
   }, 10 * 60 * 1000);

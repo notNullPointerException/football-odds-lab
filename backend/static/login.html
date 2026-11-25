@@ -302,14 +302,24 @@ input:focus { border-color: #4a9eff; }
 <script>
 const $ = s => document.querySelector(s);
 
+// 切登录/注册页时把上一页的错误提示清掉：否则「没注册先登录 → 当前用户名不存在」
+// 会跟着用户去注册，注册完切回登录页时红字还挂着，看起来像刚报的错。
+function clearAuthMsgs() {
+  const lm = $("#login-msg"), rm = $("#reg-msg");
+  if (lm) lm.textContent = "";
+  if (rm) rm.textContent = "";
+}
+
 // tabs
 $("#tab-login").onclick = () => {
+  clearAuthMsgs();
   $("#tab-login").classList.add("on");
   $("#tab-register").classList.remove("on");
   $("#panel-login").style.display = "block";
   $("#panel-register").style.display = "none";
 };
 $("#tab-register").onclick = () => {
+  clearAuthMsgs();
   $("#tab-register").classList.add("on");
   $("#tab-login").classList.remove("on");
   $("#panel-register").style.display = "block";
@@ -344,7 +354,8 @@ loadLoginCaptcha();
 
 // 手机输入法归一化。中文键盘容易把 [ 打成 ［、句末补空格、联想改字，
 // 密码框里全是圆点，用户看不见，只会拿到「用户名或密码错误」。
-// 用户名/验证码直接转半角；密码不静默改，检测到就提示重输。
+// 用户名/验证码直接转半角；密码不静默改，注册时检测到就提示重输
+// （登录页不报密码细节，失败一律按服务端原话显示）。
 const halfWidth = s => s
   .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
   .replace(/　/g, " ");
@@ -444,10 +455,6 @@ $("#btn-login").onclick = async () => {
   const remember = !!$("#login-remember")?.checked;
   const msg = $("#login-msg");
   if (!u || !p) { msg.textContent = "请填写用户名和密码"; return; }
-  if (passwordNeedsRetry(p)) {
-    msg.textContent = "密码里有全角字符或首尾空格（手机输入法常见），点密码框右侧的眼睛核对后重输";
-    return;
-  }
   if (!ccode) { msg.textContent = "请输入验证码"; return; }
   const r = await fetch("/api/auth/login", {
     method: "POST",
@@ -466,18 +473,9 @@ $("#btn-login").onclick = async () => {
       askRememberLogin(u, p);       // 第一次/换了账号：问一次「记住密码？」
     }
   } else {
-    // 401 时把「实际发出去的东西」亮出来：用户名原样回显；密码只报长度和首尾字符
-    // （粘贴常丢开头/结尾各一位，肉眼看圆点看不出来）。内容本身不回显，要看点眼睛。
-    let diag = "";
-    if (r.status === 401) {
-      const odd = [...p].filter(c => c.codePointAt(0) > 126 || c.codePointAt(0) < 32).length;
-      const first = p ? JSON.stringify(p[0]) : '""';
-      const last = p ? JSON.stringify(p[p.length - 1]) : '""';
-      diag = `（用户名：${u}；密码 ${p.length} 位，首字符 ${first}，尾字符 ${last}${odd ? `，含 ${odd} 个非 ASCII` : ""}）`;
-      const savedNow = loadSavedLogin();
-      if (savedNow && savedNow.u === u) diag += "；记住的旧密码可能已失效，请重新输入密码";
-    }
-    msg.textContent = (d.detail || "登录失败") + diag;
+    // 只显示服务端原话，不夹带用户名/密码长度/首尾字符等诊断信息：
+    //   没注册 →「当前用户名不存在」；密码错 →「用户名或密码错误」
+    msg.textContent = d.detail || "登录失败";
     document.getElementById("login-captcha").value = "";
     loadLoginCaptcha();
   }
@@ -509,7 +507,12 @@ $("#btn-register").onclick = async () => {
   });
   const d = await r.json();
   if (r.ok) {
-    $("#login-user").value = u;
+    // 注册成功后切回登录页，账号和密码都清空，让用户自己输。
+    // 不清的话会留着本机「记住密码」里旧账号（比如 admin）的用户名+密码，
+    // 用户以为填的是新账号，一点登录就是「用户名或密码错误」。
+    $("#login-user").value = "";
+    $("#login-pass").value = "";
+    $("#login-captcha").value = "";
     document.getElementById("success-modal").style.display = "flex";
   } else {
     msg.textContent = d.detail || "注册失败";

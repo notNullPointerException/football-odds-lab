@@ -245,7 +245,7 @@ async function load(page) {
     $("#btn-prev").disabled = state.page <= 1;
     $("#btn-next").disabled = state.page >= pages;
   } catch (e) {
-    if (e.status === 401) { location.replace("/login.html?v=7"); return; }
+    if (e.status === 401) { location.replace("/login.html?v=11"); return; }
     tb.innerHTML = `<tr><td colspan="8" style="color:var(--bad)">${esc(e.message)}</td></tr>`;
   }
 }
@@ -267,7 +267,7 @@ $("#f-type").addEventListener("change", () => load(1));
 $("#f-days").addEventListener("change", () => load(1));
 
 (async function boot() {
-  if (!token) { location.replace("/login.html?v=7"); return; }
+  if (!token) { location.replace("/login.html?v=11"); return; }
   try {
     const me = await apiGet("/api/auth/me");
     if (me.role !== "admin") {
@@ -278,7 +278,7 @@ $("#f-days").addEventListener("change", () => load(1));
     }
     $("#who").textContent = "当前管理员：" + me.username;
   } catch (e) {
-    if (e.status === 401) { location.replace("/login.html?v=7"); return; }
+    if (e.status === 401) { location.replace("/login.html?v=11"); return; }
     document.querySelector("main").innerHTML =
       `<div class="card"><div style="padding:14px;color:var(--bad)">${esc(e.message)}</div></div>`;
     return;

@@ -92,6 +92,17 @@ PLANS = {
 }
 
 
+def _apply_plan(user: User, plan: str) -> datetime:
+    """把套餐时长加到到期时间上：未过期从现有到期日顺延，过期/新用户从现在起算。"""
+    p = PLANS.get(plan)
+    if not p:
+        raise HTTPException(400, "套餐不存在（week/month/quarter/year）")
+    now = datetime.utcnow()
+    base = user.expires_at if (user.expires_at and user.expires_at > now) else now
+    user.expires_at = base + timedelta(weeks=p["weeks"])
+    return user.expires_at
+
+
 class LoginIn(BaseModel):
     username: str = Field(max_length=64)
     password: str = Field(max_length=64)
@@ -458,7 +469,16 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     if not verify_captcha(body.captcha_id, body.captcha_code):
         raise HTTPException(400, "验证码错误或已过期")
     user = db.query(User).filter(User.username == body.username).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    # 两个分支分开报：没注册 vs 密码错。登录页按原话显示，不夹带用户名/密码细节。
+    if not user:
+        log_action(
+            username=body.username, action_type="auth",
+            action="登录失败：用户名不存在", method="POST",
+            path="/api/auth/login", status_code=404, ip=ip,
+            ua=request.headers.get("user-agent", "")[:512], duration_ms=0,
+        )
+        raise HTTPException(404, "当前用户名不存在")
+    if not verify_password(body.password, user.password_hash):
         log_action(
             username=body.username, action_type="auth",
             action="登录失败：用户名或密码错误", method="POST",
@@ -531,18 +551,14 @@ def activate_user(
     _ensure_not_admin(user, "开通会员")
     user.is_active = True
     if plan:
-        p = PLANS.get(plan)
-        if not p:
-            raise HTTPException(400, "套餐不存在（week/month/quarter/year）")
-        now = datetime.utcnow()
-        base = user.expires_at if (user.expires_at and user.expires_at > now) else now
-        user.expires_at = base + timedelta(weeks=p["weeks"])
+        _apply_plan(user, plan)
     db.commit()
     if user.expires_at and user.role != "admin":
         set_user_expiry(user.id, user.expires_at)
     exp_bj = _to_bj(user.expires_at)
     return {"msg": f"已激活 {username}，到期 {exp_bj:%Y-%m-%d %H:%M}（北京时间）",
             "is_member": is_member(user)}
+
 
 @router.get("/admin/users")
 def admin_list_users(db: Session = Depends(get_db), _admin: User = Depends(require_admin)):

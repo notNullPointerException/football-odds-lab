@@ -68,6 +68,11 @@
     display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   }
   .card>.bd{padding:14px}
+  /* 胜负彩「接口预测」格里的完整结果：点开后在当前行下方插一行，
+     用和单场预测完成页同一张卡。 */
+  .pd-full{margin-top:4px}
+  .sfc-inline > td{padding:10px 14px;background:var(--bg)}
+  .sfc-inline .card{margin-top:0}
   .vs{font-size:15px;font-weight:600}
   .teams{display:flex;align-items:center;gap:9px}
   .teams img{width:22px;height:22px;object-fit:contain}
@@ -132,20 +137,6 @@
   .edge b.pos{color:#3ecf8e}
   .edge b.neg{color:var(--dim2)}
 
-  /* ---- 胜负彩「接口预测」列 ----
-     三行：模型首选 / LLM 首选 / LLM 比分。三头不一致时把 LLM 那行标红 ——
-     「三头一致」是这批里唯一验证过有正收益的开口条件，不一致必须一眼看见。 */
-  .pd{font-size:12px;line-height:1.5;white-space:nowrap}
-  .pd .pd-d{font-weight:600}
-  .pd .pd-d.home{color:#ff9f6b}
-  .pd .pd-d.draw{color:var(--dim)}
-  .pd .pd-d.away{color:#5fa8ff}
-  .pd .num{color:var(--dim);font-weight:500}
-  .pd .pd-l{color:var(--dim)}
-  .pd .pd-l b{color:var(--fg);font-weight:600}
-  .pd .pd-l.dis b{color:var(--warn)}
-  .pd .pd-s{color:var(--dim2);font-size:11px}
-  .pd .pd-at{color:var(--dim2);font-size:10px}
   /* 转圈圈：纯 CSS 画，不用字符 —— 字符版（|/-\）宽度会跳，这一格会跟着抖 */
   .spin{
     display:inline-block;width:14px;height:14px;vertical-align:-2px;
@@ -219,14 +210,6 @@
   .hero-k{font-size:10px;font-weight:700;letter-spacing:2.2px;color:var(--acc);text-transform:uppercase}
   .hero h2{margin:8px 0;font-size:20px;line-height:1.35;font-weight:600;letter-spacing:.2px}
   .hero .lead{margin:0;max-width:900px;color:var(--dim);font-size:13px;line-height:1.8}
-  .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:18px}
-  .pipeline .step{background:rgba(15,17,21,.55);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
-  .pipeline .step .n{
-    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    font-size:10px;color:var(--acc);letter-spacing:.8px;
-  }
-  .pipeline .step b{display:block;margin:3px 0 4px;font-size:13px;font-weight:600}
-  .pipeline .step em{display:block;font-style:normal;color:var(--dim2);font-size:11.5px;line-height:1.65}
   .hero-cta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
   .hero-cta .txt{color:var(--dim);font-size:12.5px}
   .hero-cta .go{
@@ -263,15 +246,14 @@
     .rtable td.cell-act::before{display:none}
     .rtable td.cell-act .act{width:100%;padding:9px 14px;text-align:center}
     .rtable .odds{gap:10px}
-    /* 预测格在卡片里可以换行，别撑破卡片 */
-    .rtable .pd{white-space:normal}
+    /* 接口预测下方就地展开的完整结果：不要跟着普通行吃上下 padding */
+    .rtable tr.sfc-inline{padding:0 14px 12px}
+    .rtable tr.sfc-inline > td{padding:0;margin-top:0}
     /* 14 场的场次号（1~14）和对阵是手机上找场次的主要线索，单独放大。
        只作用于胜负彩 tab，别让竞彩/复盘表的字号跟着变。 */
     #tab-sfc .rtable td.mnum{font-size:22px;line-height:1.25}
     #tab-sfc .rtable td.mnum a.jump{font-size:22px;font-weight:600}
     #tab-sfc .rtable .fx{font-size:17px;line-height:1.4}
-    /* 介绍条的四步改 2×2：否则光介绍就占掉两屏，按钮还在更下面 */
-    .pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}
     /* iOS 聚焦 <16px 的输入框会自动放大页面，按手机规格提到 16px 避免误触 */
     input[type=number],input[type=date],input[type=text],input[type=password],select{font-size:16px}
   }
@@ -319,43 +301,9 @@
   a.small{color:var(--acc);font-size:12px;cursor:pointer;text-decoration:none}
   a.small:hover{text-decoration:underline}
 
-  /* ---- 接口返回详情浮层（点胜负彩的「接口预测」格展开）----
-     静止状态【不占位也不改外观】：浮层是 body 下一个独立元素，格子只多一个
-     data-detail 属性 + 悬停底色当提示，不点开时页面跟以前一模一样。 */
-  .pd-cell[data-detail]{cursor:pointer}
-  .pd-cell[data-detail]:hover{background:rgba(255,255,255,.045)}
-  #sfc-pop{
-    position:fixed;left:0;top:0;z-index:900;display:none;
-    background:#12151b;border:1px solid var(--line);border-radius:10px;
-    box-shadow:0 14px 44px rgba(0,0,0,.62);
-    width:min(720px,92vw);max-height:min(72vh,640px);
-  }
-  #sfc-pop.on{display:flex;flex-direction:column}
-  #sfc-pop .ph{
-    display:flex;align-items:center;gap:10px;padding:9px 12px;flex:0 0 auto;
-    border-bottom:1px solid var(--line);
-  }
-  #sfc-pop .ph .t{
-    flex:1 1 auto;min-width:0;font-size:12px;color:var(--dim);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  }
-  #sfc-pop .ph .t b{color:var(--fg);font-weight:600}
-  #sfc-pop .px{
-    flex:0 0 auto;background:none;border:0;color:var(--dim);font-size:18px;
-    line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px;
-  }
-  #sfc-pop .px:hover{color:var(--fg);background:rgba(255,255,255,.07)}
-  #sfc-pop .pb{flex:1 1 auto;overflow:auto;padding:6px 0 8px}
-  #sfc-pop table{width:100%;border-collapse:collapse;font-size:12px}
-  #sfc-pop td{padding:3px 14px;vertical-align:top;border:0;word-break:break-word;
-    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  #sfc-pop td.k{color:var(--dim);width:1%;white-space:nowrap}
-  /* pre-wrap：伤停/首发是多行文本（一行一个球员），不保留换行会被压成一整条。
-     td.k 是 nowrap 的列名，只有值列需要。 */
-  #sfc-pop td.v{color:var(--fg);white-space:pre-wrap}
-  #sfc-pop .pb details{margin:10px 14px 0}
-  #sfc-pop .pb pre{max-height:280px;margin-top:8px}
+  /* 接口预测格：本会话跑完预测后整格可点，点开就是完整预测卡。 */
+  .pd-cell[data-full-cell]{cursor:pointer}
+  .pd-cell[data-full-cell]:hover{background:rgba(255,255,255,.045)}
   /* 密码框眼睛图标：注册、重置密码共用。图标放在输入框内部右侧，
      睁眼/闭眼靠 .on 切 —— 就是常见网页的做法，不占额外一行。 */
   .pass-wrap{position:relative;margin-bottom:8px}
@@ -384,14 +332,14 @@
     const icon = document.getElementById("btn-user-icon");
     if (icon) {
       icon.onclick = () => {
-        location.href = "/login.html?v=7";
+        location.href = "/login.html?v=11";
       };
     }
     // 个人中心里的登录按钮也跳独立页
     const ucLogin = document.getElementById("uc-to-login");
-    if (ucLogin) ucLogin.onclick = () => location.href = "/login.html?v=7";
+    if (ucLogin) ucLogin.onclick = () => location.href = "/login.html?v=11";
     const ucReg = document.getElementById("uc-to-register");
-    if (ucReg) ucReg.onclick = () => location.href = "/login.html?v=7#register";
+    if (ucReg) ucReg.onclick = () => location.href = "/login.html?v=11#register";
   });
 })();
 </script>
@@ -400,7 +348,7 @@
 <script>
 // 会话失效检查：页面加载时 + 接口 401 时跳转登录页
 (function(){
-  const LOGIN = "/login.html?v=7";
+  const LOGIN = "/login.html?v=11";
   async function checkSession() {
     const token = localStorage.getItem("token");
     if (!token) return false;
@@ -485,28 +433,10 @@
     <div class="hero">
       <div class="hero-k">JC Matchday Desk</div>
       <h2>单场竞彩：独立建模、双轨定价、赛后归因</h2>
-      <p class="lead">竞彩的难点不在单场强弱，而在于同一晚多场在售比赛中的场次筛选。模型对每场分别给出胜平负、让球与大小球概率，再把体彩官方去水盘、庄家锐盘与模型首选并排放；让球线单独建模，不并进胜平负混算。预测在停售前锁定，赛果出来后逐场回看。</p>
-      <div class="pipeline">
-        <div class="step">
-          <div class="n">01 / BOARD</div><b>在售盘面</b>
-          <em>按停售时间与联赛排列，早停售、编号与让球线先行呈现，避免筛选后才错过截止。</em>
-        </div>
-        <div class="step">
-          <div class="n">02 / MODEL</div><b>逐场建模</b>
-          <em>XGBoost 出胜平负 / 大小球，泊松刻画净胜球与让球线，大模型补阵容与战意。</em>
-        </div>
-        <div class="step">
-          <div class="n">03 / ANCHOR</div><b>盘口锚定</b>
-          <em>体彩去水概率、庄家锐盘与模型首选三方并排，水位差和背离逐项标注。</em>
-        </div>
-        <div class="step">
-          <div class="n">04 / AUDIT</div><b>赛果回看</b>
-          <em>停售前存档，赛后按赛果、让球结果与冷门分布回看，区分模型偏差与市场冷门。</em>
-        </div>
-      </div>
+      <p class="lead">按停售时间与联赛排列在售场次，每场分别给出胜平负、让球与大小球概率；体彩官方去水盘、庄家锐盘与模型首选并排对照，让球线单独建模。停售前锁定预测，赛果出来后逐场回看。</p>
       <div class="hero-cta" data-hero-cta>
         <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
-        <a class="go" data-hero-cta-link href="/login.html?v=7#register">注册 / 开通会员</a>
+        <a class="go" data-hero-cta-link href="/login.html?v=11#register">注册 / 开通会员</a>
       </div>
     </div>
     <div class="bar">
@@ -524,28 +454,10 @@
     <div class="hero">
       <div class="hero-k">14-Match Pool Stack</div>
       <h2>一期 14 场，逐场建模，整期复盘</h2>
-      <p class="lead">胜负彩不是 14 个孤立的单选。同一期内的强弱差、平局概率与赛程密度会共同影响票面。引擎以同一套特征口径逐场给出胜平负概率，并把体彩官方盘与庄家去水盘并排对照；预测在赛前锁定存档，开奖后按模型头、市场侧与冷门分布逐期回看。</p>
-      <div class="pipeline">
-        <div class="step">
-          <div class="n">01 / SCAN</div><b>全期统一口径</b>
-          <em>14 场共用同一套特征与校准，避免跨联赛、跨期口径漂移。</em>
-        </div>
-        <div class="step">
-          <div class="n">02 / PRICE</div><b>双轨定价</b>
-          <em>体彩官方盘与庄家去水盘并排，水位差单独标注，不混成一条概率。</em>
-        </div>
-        <div class="step">
-          <div class="n">03 / SNAPSHOT</div><b>赛前快照</b>
-          <em>预测与赔率锁定在开赛前，赛后不可回改，复盘才有意义。</em>
-        </div>
-        <div class="step">
-          <div class="n">04 / REVIEW</div><b>开奖复盘</b>
-          <em>按模型头、市场命中与冷门分布逐期回看，区分实力与运气。</em>
-        </div>
-      </div>
+      <p class="lead">同一期 14 场用同一套特征口径逐场给出胜平负概率，体彩官方盘与庄家去水盘并排对照。预测在赛前锁定存档，开奖后按模型头、市场侧与冷门分布逐期回看。</p>
       <div class="hero-cta" data-hero-cta>
         <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
-        <a class="go" data-hero-cta-link href="/login.html?v=7#register">注册 / 开通会员</a>
+        <a class="go" data-hero-cta-link href="/login.html?v=11#register">注册 / 开通会员</a>
       </div>
     </div>
     <div class="bar">
@@ -572,28 +484,10 @@
     <div class="hero">
       <div class="hero-k">Match Prediction Stack</div>
       <h2>一场比赛，三层模型交叉验证</h2>
-      <p class="lead">把球队近 5 / 10 场攻防、主客场分化、联赛排名，与伤停名单、确认首发、机构赔率去水放进同一套特征工程。XGBoost 给出胜平负与大小球概率，双泊松刻画比分分布，大模型把阵容与战意翻译成可读结论；三层结果并列展示，分歧不隐藏。</p>
-      <div class="pipeline">
-        <div class="step">
-          <div class="n">01 / FEATURES</div><b>特征工程</b>
-          <em>78 维球队状态、攻防效率、主客场分化与排名差，统一口径。</em>
-        </div>
-        <div class="step">
-          <div class="n">02 / PROBABILITY</div><b>概率与比分</b>
-          <em>XGBoost 胜平负 / 大小球概率；双泊松输出最可能 Top3 比分。</em>
-        </div>
-        <div class="step">
-          <div class="n">03 / CONTEXT</div><b>阵容与动机</b>
-          <em>伤停、首发、赛程密度与战意，由大模型结构化解读。</em>
-        </div>
-        <div class="step">
-          <div class="n">04 / CROSS-CHECK</div><b>模型 / 市场对照</b>
-          <em>模型首选、大模型方向与赔率去水概率并列，分歧单独标记。</em>
-        </div>
-      </div>
+      <p class="lead">球队近 5 / 10 场攻防、主客场分化、排名差，与伤停、首发、赔率去水一起进入特征工程；XGBoost 出胜平负与大小球，双泊松出比分，大模型补阵容与战意。三层结果并列，分歧不隐藏。</p>
       <div class="hero-cta" data-hero-cta>
         <span class="txt" data-hero-cta-text>游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。</span>
-        <a class="go" data-hero-cta-link href="/login.html?v=7#register">注册 / 开通会员</a>
+        <a class="go" data-hero-cta-link href="/login.html?v=11#register">注册 / 开通会员</a>
       </div>
     </div>
     <div class="bar">
@@ -660,6 +554,7 @@
 
     <p class="hint" style="margin-top:10px">
       开通规则：非会员从今天起算；未到期的会员从现有到期日往后顺延，不吞剩余天数。
+      确认收款后在上方「用户列表」里给对应用户开通/续费即可。
     </p>
   </section>
 </main>
@@ -993,6 +888,82 @@ function resultBar(b, r) {
   return `<span class="tag acc">已开赛 ${mins} 分钟${score ? ` · ${score}` : " · 比分未同步"}</span>${stale}`;
 }
 
+/* ---------------- 伤停信息 ----------------
+   后端把喂进 LLM 的伤停原文一并带出（llm.injuries），形如：
+     伤停名单:
+     主队None: A. McCarthy - 缺阵 - Red Card | ...
+   或「该场比赛暂无伤停数据」「伤停数据获取失败…」。
+   reason 是 API 原文（英文），这里翻成中文再显示；球员名保留原文。
+   没有名单时渲染一个空的「–」行。 */
+const INJ_REASON_ZH = {
+  "Injury": "受伤", "Off the roster": "未进报名名单", "Inactive": "未激活",
+  "Red Card": "红牌停赛", "Yellow Cards": "累积黄牌停赛", "Suspended": "停赛",
+  "International duty": "国家队征召", "Lacking Match Fitness": "缺乏比赛状态",
+  "Illness": "疾病", "Health problems": "健康问题", "Heart Problems": "心脏问题",
+  "Jumpers Knee": "跳膝（髌腱炎）", "Knock": "碰撞伤", "Concussion": "脑震荡",
+  "Hernia": "疝气", "Rest": "轮休", "Contusion": "挫伤", "Muscle Bruise": "肌肉挫伤",
+  "Loan agreement": "租借条款限制", "Broken Leg": "腿部骨折",
+  "Coach's decision": "教练决定", "Surgery": "手术", "Fitness": "体能问题",
+  "Personal Reasons": "个人原因", "Unknown": "未知", "Covid-19": "新冠",
+};
+const INJ_TYPE_ZH = {
+  "Injured": "伤停", "Suspended": "停赛", "Missing Fixture": "缺阵",
+  "Questionable": "存疑", "Out": "缺阵", "Doubtful": "存疑",
+};
+const INJ_PART_ZH = {
+  knee: "膝", muscle: "肌肉", ankle: "脚踝", thigh: "大腿", foot: "脚",
+  leg: "腿", calf: "小腿", hamstring: "腿筋", groin: "腹股沟", shoulder: "肩",
+  hip: "髋", "achilles tendon": "跟腱", hand: "手", finger: "手指", ribs: "肋骨",
+  heel: "脚跟", back: "背", neck: "颈部", "lower-body": "下肢", abdominal: "腹部",
+  head: "头部", eye: "眼部", toe: "脚趾", wrist: "手腕", elbow: "肘部", arm: "手臂",
+};
+function injTextZh(s) {
+  const k = String(s || "").trim();
+  if (!k) return "";
+  if (INJ_REASON_ZH[k]) return INJ_REASON_ZH[k];
+  // 「Knee Injury / Thigh Problems / Abdominal strain」按部位拆开翻；
+  // 没收录的部位保留原文，别硬翻成错误的伤情。
+  const m = k.match(/^(.+?)\s+(Injury|Problems|strain)$/i);
+  const part = m && INJ_PART_ZH[m[1].toLowerCase()];
+  if (part) return part + ({ injury: "伤", problems: "问题", strain: "拉伤" })[m[2].toLowerCase()];
+  return k;
+}
+function parseInjuryTeams(text) {
+  const s = String(text || "").trim();
+  if (!s.startsWith("伤停名单")) return null;   // 暂无伤停数据 / 获取失败 / 空
+  const out = [];
+  for (const raw of s.split(/\r?\n/).slice(1)) {
+    const line = raw.trim();
+    if (!line) continue;
+    // 老数据里是「主队None:」，队名那段丢掉（卡片头部已经显示主客队名）
+    const m = line.match(/^(主队|客队|球队)[^:：]*[:：]\s*(.+)$/);
+    if (!m) continue;
+    const entries = m[2].split("|").map(x => x.trim()).filter(Boolean).map(e => {
+      const ps = e.split(" - ").map(x => x.trim()).filter(Boolean);
+      if (!ps.length || !ps[0]) return null;
+      const type = INJ_TYPE_ZH[ps[1]] || ps[1] || "";
+      const extra = INJ_TYPE_ZH[ps[3]] || ps[3] || "";
+      return { name: ps[0], type, reason: injTextZh(ps[2] || ""), extra };
+    }).filter(Boolean);
+    if (entries.length) out.push({ side: m[1], entries });
+  }
+  return out.length ? out : null;
+}
+function injuryBlockHtml(l) {
+  const teams = parseInjuryTeams(l && l.injuries);
+  const rows = teams
+    ? teams.map(t => `<div class="row" style="display:block">
+        <span class="k">${esc(t.side)}</span>
+        <div class="v" style="margin-top:4px;line-height:1.75;font-weight:400">${t.entries
+          .map(e => {
+            const tag = [e.type, e.reason, e.extra].filter(Boolean).map(esc).join(" · ");
+            return `${esc(e.name)}${tag ? "（" + tag + "）" : ""}`;
+          }).join("<br>")}</div>
+      </div>`).join("")
+    : `<div class="row"><span class="k">名单</span><span class="v">–</span></div>`;
+  return `<div class="blk"><h3>伤停信息</h3>${rows}</div>`;
+}
+
 function renderRecord(d, opts = {}) {
   const b = d.basic || {}, x = d.xgb || {}, l = d.llm || {}, r = d.result;
   const p = x.prob || {};
@@ -1019,7 +990,9 @@ function renderRecord(d, opts = {}) {
     b.fixture_id ? `<span class="hint code">#${esc(b.fixture_id)}</span>` : "",
   ].join("");
 
-  const resultHtml = resultBar(b, r);
+  // 胜负彩的完整卡片不用 resultBar：那边接口只给日期不给开球状态，
+  // 走时间兜底会把「仅日期」误判成已开赛/已结束；真实比分在「历史预测」里看。
+  const resultHtml = opts.hideResult ? "" : resultBar(b, r);
 
   // Array.isArray 兜底：predictions.py 的 top3_scores 解析失败时会留成字符串，
   // 此时 (x.top3 || []).map 会抛，整页变成「加载失败」而不是只丢这一格
@@ -1044,15 +1017,18 @@ function renderRecord(d, opts = {}) {
           <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${top3 || '<span class="hint">–</span>'}</div></div>
       </div>
 
-      <div class="blk">
-        <h3>LLM 分析</h3>
-        <div class="row"><span class="k">方向 / 信心</span>
-          <span class="v">${esc(l.win || "–")} <span style="color:var(--acc)">${esc(l.win_pct || "")}</span></span></div>
-        <div class="row"><span class="k">比分</span><span class="v num">${esc(l.score || "–")}</span></div>
-        <div class="row"><span class="k">让球 / 概率</span>
-          <span class="v">${esc(hcText(l))} <span style="color:var(--acc)">${esc(l.handicap_pct || "")}</span></span></div>
-        <div class="row"><span class="k">大小球 / 概率</span>
-          <span class="v">${esc(ouText(l))} <span style="color:var(--acc)">${esc(l.ou_pct || "")}</span></span></div>
+      <div style="display:grid;gap:14px;align-content:start">
+        ${injuryBlockHtml(l)}
+        <div class="blk">
+          <h3>LLM 分析</h3>
+          <div class="row"><span class="k">方向 / 信心</span>
+            <span class="v">${esc(l.win || "–")} <span style="color:var(--acc)">${esc(l.win_pct || "")}</span></span></div>
+          <div class="row"><span class="k">比分</span><span class="v num">${esc(l.score || "–")}</span></div>
+          <div class="row"><span class="k">让球 / 概率</span>
+            <span class="v">${esc(hcText(l))} <span style="color:var(--acc)">${esc(l.handicap_pct || "")}</span></span></div>
+          <div class="row"><span class="k">大小球 / 概率</span>
+            <span class="v">${esc(ouText(l))} <span style="color:var(--acc)">${esc(l.ou_pct || "")}</span></span></div>
+        </div>
       </div>
 
       <div class="blk" style="grid-column:1/-1">
@@ -1068,11 +1044,13 @@ function renderRecord(d, opts = {}) {
     </div>
   `;
 
+  // 胜负彩的卡头要带「第 N 场」；单场预测/历史没有这个参数，渲染结果不变。
+  const pre = opts.prefix ? `<span class="tag acc">${esc(opts.prefix)}</span>` : "";
   const head = opts.collapsible
     ? `<summary style="padding:11px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer;list-style:none">
-         ${teams}${meta}${resultHtml}
+         ${pre}${teams}${meta}${resultHtml}
        </summary>`
-    : `<div class="hd">${teams}${meta}${resultHtml}</div>`;
+    : `<div class="hd">${pre}${teams}${meta}${resultHtml}</div>`;
 
   return opts.collapsible
     ? `<details class="card">${head}<div class="bd">${body}</div></details>`
@@ -1096,13 +1074,19 @@ function switchTab(name) {
     if (window.loadAdminUsers) window.loadAdminUsers();
   }
 }
-$$("nav button").forEach(b => b.onclick = () => {
+/* 进「预测比赛」页的两类入口都要过会员门槛（ensureMember）：
+   没登录 → 登录页；登录了但没会员 → 个人中心充值页（/center.html）。
+   否则从体彩/胜负彩的场次编号链接、历史页「重新跑这场」可以直接进预测页，绕过门槛。 */
+$$("nav button").forEach(b => b.onclick = async () => {
   trackClick("菜单：" + b.textContent.trim());
+  if (b.dataset.tab === "predict" && !(await window.ensureMember())) return;
   switchTab(b.dataset.tab);
 });
 
 // 把某个 fixture 载入预测页（体彩页和预测历史页共用）
-function loadIntoPredict(fid) {
+async function loadIntoPredict(fid) {
+  const me = await window.ensureMember();
+  if (!me) return;           // 未登录 → 登录页；非会员 → 个人中心充值页
   $("#fid").value = fid;
   switchTab("predict");
   $("#predict-out").innerHTML =
@@ -1250,35 +1234,7 @@ function bookCell(b) {
     oddsCells(pool, [["主胜","p_h","h"],["平","p_d","d"],["客胜","p_a","a"]], true);
 }
 
-/* ---------------- 胜负彩「接口预测」列 ----------------
-   三头里只画两个：prob 头（首选+概率）和 LLM 头（方向+信心），外加 LLM 比分。
-   λ【故意不画】—— 实测 GLOBAL 组在国家队场次是垃圾（9-26 那批 4 条背离腿
-   全反），画出来只会诱导人拿它当依据。想看的话 title 里有。 */
-const PD_DIR = { home: "主胜", draw: "平局", away: "客胜" };
-
-/* prob 头的首选方向。三个都为空返回 null —— 不能让 max() 去挑 undefined，
-   那会把「没有数据」显示成「主胜」。 */
-function predPick(pred) {
-  const p = (pred && pred.prob) || {};
-  let dir = null, best = -1;
-  for (const d of ["home", "draw", "away"]) {
-    const v = p[d];
-    if (v !== null && v !== undefined && !isNaN(v) && v > best) { best = v; dir = d; }
-  }
-  return dir === null ? null : { dir, prob: best };
-}
-
-/* LLM 的 "主胜"/"客胜"/"平" → home/away/draw。认不出来返回 null（当「无从比对」，
-   不是「不一致」—— 把认不出当分歧会天天报假警报）。 */
-function llmDir(w) {
-  const s = String(w || "");
-  if (s.includes("主")) return "home";
-  if (s.includes("客")) return "away";
-  if (s.includes("平")) return "draw";
-  return null;
-}
-
-function predCell(pred, llm, st) {
+function predCell(pred, st) {
   if (st === "loading") return `<span class="spin" title="正在调用预测接口…"></span>`;
   if (st) {
     // st.detail 是后端原样给的原因（api() 挂上去的）——「LLM 未返回完整预测」和
@@ -1291,31 +1247,9 @@ function predCell(pred, llm, st) {
   }
   if (!pred) return `<span class="off" title="这场还没跑过预测">未跑</span>`;
 
-  const pk = predPick(pred);
-  const lam = pred.lambda
-    ? `λ ${fnum(pred.lambda.home)}/${fnum(pred.lambda.away)}` : "";
-  const tip = [pred.model_group, lam, pred.handicap, pred.at ? `跑于 ${pred.at}` : ""]
-    .filter(Boolean).join(" · ");
-
-  const top = `<div>` + (pk
-    ? `<span class="pd-d ${pk.dir}">${PD_DIR[pk.dir]}</span>
-       <span class="num">${pct(pk.prob)}</span>`
-    : `<span class="off">无 prob</span>`) + `</div>`;
-
-  // 与模型首选不一致就标红。「三头一致」是这批里唯一验出正收益的开口条件，
-  // 不一致的那格必须一眼看见，不能靠人去比对两行字。
-  const lw = (llm && llm.win) ? String(llm.win) : "";
-  const dis = !!(pk && lw && llmDir(lw) && llmDir(lw) !== pk.dir);
-  const lline = lw
-    ? `<div class="pd-l${dis ? " dis" : ""}"
-         title="${dis ? "LLM 头与模型首选不一致" : ""}">LLM <b>${esc(lw)}</b>${
-         llm.win_pct ? ` <span class="num">${esc(llm.win_pct)}</span>` : ""}${
-         dis ? " 分歧" : ""}</div>`
-    : "";
-  const sline = (llm && llm.score)
-    ? `<div class="pd-s">${esc(llm.score)}</div>` : "";
-
-  return `<div class="pd" title="${esc(tip)}">${top}${lline}${sline}</div>`;
+  // 接口预测格里不再重复列「主胜% / LLM / 比分」—— 这些都在「完整预测」卡里，
+  // 格子里只留入口。库里有旧预测但本会话没跑时也不显示摘要。
+  return "";
 }
 
 /* 水 = 庄家去水 − 体彩去水（百分点）。
@@ -1469,7 +1403,7 @@ $("#jc-refresh").onclick = () => loadJc(true);
 // raw：本会话跑过的场次，原样存一份 POST /api/predict/{id} 的【整包响应】。
 // 格子只显示三行，但点开要看全部（含只写库、列表接口都不给的 llm 长文本字段），
 // 归一化过的 np 已经丢了大半字段，所以必须另外留一份原始 body。
-const sfc = { loaded: false, payload: null, inflight: false, tick: null, st: {}, raw: {} };
+const sfc = { loaded: false, payload: null, inflight: false, tick: null, st: {}, raw: {}, full: new Set() };
 
 async function loadSfc(force) {
   if (sfc.inflight) return;           // 同体彩页：挡住来回切 tab 的请求堆积
@@ -1514,29 +1448,72 @@ async function loadSfc(force) {
   }
 }
 
-/* 画胜负彩表。两条路（有场次 / 空态）画法不同，但「浮层必须锚在活的格子上」这条规矩
-   只有一条 —— 所以收在一个出口上跑 syncSfcPop。
-   🔴 别再把它写进某条分支的末尾：上一版就写在末尾，而空态那条是 `return` 早退，
-   直接跳过了，结果表格清空后浮层还悬在屏幕上指着已经不存在的格子。
-   （同一个坑我在这页犯过第二次了 —— renderSfc 的「重跑」绑定当初也是这么漏的。） */
 function renderSfc() {
   renderSfcBody();
-  syncSfcPop();
 }
 
-/* 浮层要么锚在一个还活着的格子上，要么关掉。任何一次重画之后都得过一遍。 */
-function syncSfcPop() {
-  if (sfcPopFid === null) return;
-  const td = $(`#sfc-out tr[data-fid="${sfcPopFid}"] td[data-detail]`);
-  if (!td) { closeSfcPop(); return; }
-  // 数据源换了就重铺内容，没换只挪位置。
-  // 为什么不一律重铺：重铺会把 .pb 的 scrollTop 归零，用户刚滚下去看 deep_report
-  // 就被弹回顶部 —— 而 renderSfc 是刷新按钮 / 跑完一场都会走的。
-  // 指纹用 sfc.raw[fid] 这个【对象引用】：跑完一场它必然换新对象；没跑过的场次
-  // 一直是 undefined → 统一记成 "payload"。列表路径的 d.data 每次都新建，不能拿它当指纹。
-  const key = sfc.raw[sfcPopFid] || "payload";
-  if (key !== sfcPopKey) { openSfcPop(sfcPopFid, td); return; }
-  placeSfcPop(td);
+/* 胜负彩「接口预测」格里就地展开的完整预测卡（数据源）。
+   🔴 只认本会话点过预测的 POST /api/predict/{id} 整包（sfc.raw）——
+   没点预测（哪怕库里/列表接口有旧结果）就不给「完整预测」入口。 */
+function sfcFullRecord(m) {
+  if (!m || !m.fixture_id) return null;
+  const raw = sfc.raw[m.fixture_id];
+  if (raw && raw.err) return null;                 // 这次重跑失败，别拿旧数据冒充
+  const rr = raw && raw.data && raw.data.result;
+  if (!rr) return null;
+  return normalizePredict(rr, {
+    id: m.fixture_id,
+    home_name: m.home,
+    away_name: m.away,
+    league_name: m.league,
+    date: m.kickoff || m.match_date || null,
+  });
+}
+
+/* 接口预测格里的「完整预测」链接。只有这场真有可展示数据时才给，
+   避免未跑/跑失败的格子点开是一张空卡。 */
+function sfcFullLink() {
+  return `<div class="pd-full"><a class="small" data-full="1"
+      title="展开这场的完整预测结果（可收起）">完整预测</a></div>`;
+}
+
+/* 在当前比赛行下方插一张完整预测卡；返回插入的行，插不进去返回 null。
+   开/关状态由调用方维护（sfc.full），这样表格重画后还能把已展开的卡恢复出来。 */
+function sfcFullInlineRow(tr, m) {
+  const rec = sfcFullRecord(m);
+  if (!tr || !rec) return null;
+  const fid = m.fixture_id;
+  const row = document.createElement("tr");
+  row.className = "sfc-inline";
+  row.dataset.inlineFid = String(fid);
+  row.innerHTML = `<td colspan="6">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+        <button class="ghost" type="button" data-full-close>收起</button>
+      </div>
+      ${renderRecord(rec, { prefix: `第 ${m.no} 场`, hideResult: true })}
+    </td>`;
+  tr.parentNode.insertBefore(row, tr.nextSibling);
+  row.querySelector("[data-full-close]").onclick = () => {
+    sfc.full.delete(fid);
+    row.remove();
+  };
+  return row;
+}
+
+/* 点「完整预测」：同一场再点一次收起；不同场次互不影响（跟体彩页同一套规则）。 */
+function toggleSfcFull(tr, m) {
+  if (!tr || !m || !m.fixture_id) return;
+  const fid = m.fixture_id;
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains("sfc-inline") &&
+      Number(next.dataset.inlineFid) === fid) {
+    sfc.full.delete(fid);
+    next.remove();
+    return;
+  }
+  sfc.full.add(fid);
+  if (next && next.classList.contains("sfc-inline")) next.remove();
+  if (!sfcFullInlineRow(tr, m)) sfc.full.delete(fid);
 }
 
 function renderSfcBody() {
@@ -1561,11 +1538,6 @@ function renderSfcBody() {
       : `<span class="num">${esc(mdShort)}</span>` +
         `<span class="off" title="胜负彩接口不提供开球时间，且该场当期竞彩未开售"> · 仅日期</span>`;
 
-    const res = m.result
-      ? `<span class="tag" title="${esc(m.result_label || "")}赛">${esc(m.result)}</span>` +
-        (m.score ? ` <span class="num" style="font-size:12px">${esc(m.score)}</span>` : "")
-      : `<span class="off">未开奖</span>`;
-
     // fixture_id 与体彩页【同源】：两边都走同一个 jc_match_service（含同一份
     // overrides）——竞彩场次用开球时间窄窗、竞彩没开售的用日期窗兜底，
     // 所以同一场比赛在两个页面显示的 id 必然一致。给得出就同样可点直达预测页。
@@ -1577,8 +1549,12 @@ function renderSfcBody() {
     // 接口预测那一格。状态存在 sfc.st 里而不是闭包变量里 —— 页面重画（刷新按钮 /
     // 切销售日）时正在跑的场次必须继续转圈，不能变回「未跑」。
     const st = m.fixture_id ? sfc.st[m.fixture_id] : null;
+    // 有完整数据才给入口；转圈/失败期间不给。整个格子都可点，
+    // 链接只是提示 —— 别让人点在链接旁边却弹出别的窗口。
+    const canFull = !!(m.fixture_id && !st && sfcFullRecord(m));
+    const fullLink = canFull ? sfcFullLink() : "";
     const pdCell = m.fixture_id
-      ? predCell(m.pred, m.llm, st)
+      ? predCell(m.pred, st) + fullLink
       : `<span class="off" title="这场编不出 fixture_id，跑不了预测">–</span>`;
 
     return `<tr data-fid="${esc(m.fixture_id || "")}">
@@ -1592,8 +1568,7 @@ function renderSfcBody() {
       <td data-label="体彩胜平负（去水）">${oddsCells(m.had, [["主胜","p_h","h"],["平","p_d","d"],["客胜","p_a","a"]])}
           ${edgeLine(m.had, m.book)}</td>
       <td data-label="庄家盘（去水）">${bookCell(m.book)}</td>
-      <td class="pd-cell" data-label="接口预测"${m.fixture_id ? ` data-detail="1"` : ""}>${pdCell}</td>
-      <td data-label="彩果">${res}</td>
+      <td class="pd-cell" data-label="接口预测"${canFull ? ` data-full-cell="1"` : ""}>${pdCell}</td>
     </tr>`;
   }).join("");
 
@@ -1610,17 +1585,27 @@ function renderSfcBody() {
         <thead><tr>
           <th>场次 / id</th><th>联赛</th><th>对阵 / 开球</th>
           <th>体彩胜平负（去水）</th><th>庄家盘（去水）</th>
-          <th>接口预测</th><th>彩果</th>
+          <th>接口预测</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
       </div>
-    </div>
     </div>`;
 
   $$("a.jump", out).forEach(a => a.onclick = ev => {
     ev.preventDefault();
     loadIntoPredict(parseInt(a.dataset.fid, 10));
+  });
+
+  // 表格重画后恢复已展开的完整预测卡：批量跑完 / 单场重跑都会走这里。
+  // 正在转圈的场次先不铺旧数据，等它们跑完再恢复。
+  const byFid = new Map(ms.filter(m => m.fixture_id).map(m => [m.fixture_id, m]));
+  [...sfc.full].forEach(fid => {
+    const m = byFid.get(fid);
+    if (!m) { sfc.full.delete(fid); return; }
+    if (sfc.st[fid] === "loading") return;
+    const tr = $(`#sfc-out tr[data-fid="${fid}"]`);
+    if (!tr || !sfcFullInlineRow(tr, m)) sfc.full.delete(fid);
   });
 
   paintSfcDeadline();
@@ -1655,269 +1640,25 @@ $("#sfc-refresh").onclick = () => loadSfc(true);
    不放进 renderSfc 里绑：renderSfc 在「没有场次」时会提前 return，绑在函数末尾就会漏绑，
    而且 patchSfcPred 重写单个格子 innerHTML 时，绑在格子上的 handler 也会跟着丢。 */
 $("#sfc-out").addEventListener("click", ev => {
-  const a = ev.target.closest("a[data-rerun]");
-  if (!a) return;
+  // 重跑优先：失败格里的「重跑」不能被下面的整格展开吃掉。
+  const rerun = ev.target.closest("a[data-rerun]");
+  if (rerun) {
+    ev.preventDefault();
+    const tr = rerun.closest("tr[data-fid]");
+    if (tr) rerunOneSfc(parseInt(tr.dataset.fid, 10));
+    return;
+  }
+  // 「完整预测」：链接和整格都可点，就地展开/收起这一场的完整卡。
+  // 链接很小，点偏一点点也不该弹出原始 JSON 浮层 —— 那个已经停用。
+  const entry = ev.target.closest("a[data-full]") ||
+                ev.target.closest("td.pd-cell[data-full-cell]");
+  if (!entry) return;
   ev.preventDefault();
-  const tr = a.closest("tr[data-fid]");
-  if (tr) rerunOneSfc(parseInt(tr.dataset.fid, 10));
-});
-
-/* ---------------- 接口返回详情浮层 ----------------
-   需求原话：「把接口返回的全部信息通过失焦的方式展示详细的内容，鼠标点上去可以看到全部的内容，
-   鼠标不点上去看到的就是现在的样子」。落到代码上是三条约束：
-     1. 格子的【静止外观一个像素都不改】—— 触发器就是 <td class="pd-cell"> 上那个
-        data-detail 属性（悬停只加一点底色 + pointer 光标当提示），浮层是 body 下的独立元素；
-     2. 点开是【只读展示】，不给它加任何编辑/提交能力，看错东西的风险为零；
-     3. 关掉的方式：点别处 / 点同一格 / Esc / 滚页面 / 改窗口大小 —— 前三种是「失焦」，后两种是
-        位置会失真（浮层是 position:fixed，页面一滚就跟格子错位），直接收掉比重算省事可靠。
-
-   两个数据源，取到哪个显示哪个（标题栏写明来源，别让人以为看到的是同一份）：
-     POST /api/predict/{fid} —— 本会话现场跑的，最全（含 llm 的长文本字段，列表接口不给）
-     GET  /api/sfc/matches   —— 页面加载时列表接口给的 {pred, llm, book} 三块
-   跑过的以 POST 为准（字段更全），没跑过的退回列表块。 */
-const SFC_POP = (() => {
-  // 用 createElement 而不是写进 body 的 HTML：浮层是这一个功能的私有单例，
-  // 跟它的渲染/定位/关闭逻辑放在一起，读的时候不用在 1600 行里两头跳。
-  const el = document.createElement("div");
-  el.id = "sfc-pop";
-  el.innerHTML = `<div class="ph"><span class="t"></span>
-      <button class="px" type="button" title="关闭（Esc）">×</button></div>
-    <div class="pb"></div>`;
-  document.body.appendChild(el);
-  return { el, t: el.querySelector(".t"), b: el.querySelector(".pb") };
-})();
-
-let sfcPopFid = null;      // 当前浮层对着哪一场；null = 没开
-let sfcPopKey = null;      // 铺内容时用的数据指纹，见 syncSfcPop
-
-/* 递归拍平成 [路径, 值] 两列。【不挑字段】：写死字段名迟早会漏掉后端新加的键，
-   而这里要的就是「全部信息」，漏一个就名不副实 —— 所以走通用遍历，后端加字段这里自动就有。
-   用 full.path.leaf 而不是缩进：嵌套最深三四层，写全路径省横向空间，也能直接对照原始 JSON。 */
-function flatRows(v, path, out) {
-  if (v === null || v === undefined) { out.push([path, "—"]); return out; }
-  if (typeof v !== "object") { out.push([path, String(v)]); return out; }
-  if (Array.isArray(v)) {
-    if (!v.length) { out.push([path, "[]"]); return out; }
-    v.forEach((x, i) => flatRows(x, `${path}[${i}]`, out));
-    return out;
-  }
-  const ks = Object.keys(v);
-  if (!ks.length) { out.push([path, "{}"]); return out; }
-  ks.forEach(k => flatRows(v[k], path ? `${path}.${k}` : k, out));
-  return out;
-}
-
-/* 浮层左列原来直接铺 dotted path（result.llm.brief_analysis），一眼看不出这是啥。
-   换成中文名。🔴 查不到就【原样显示路径】—— 这张表是纯增益，不是白名单：
-   后端加字段时它会照旧冒出来（顶多先是英文），绝不会被表静默吃掉；
-   反过来，表里写了后端却已经删掉的字段，也只是永远查不中，不会报错。
-   键里的 [] 是数组下标的占位（result.top3[0].score 查的是 result.top3[].score）。
-   值可以是字符串（{n} 换成 1 起的序号），也可以是数组（按下标取，越界当查不到）。 */
-const SFC_LABEL = {
-  // —— POST /api/predict/{id} 的整包响应 ——
-  "status":                    "状态",
-  "fixture_id":                "比赛 id",
-  "result.model_group":        "模型分组",
-  "result.win_home":           "主胜概率",
-  "result.win_draw":           "平局概率",
-  "result.win_away":           "客胜概率",
-  "result.over25_prob":        "大于 2.5 球概率",
-  "result.lambda_home":        "主队期望进球 λ",
-  "result.lambda_away":        "客队期望进球 λ",
-  "result.handicap":           "让球盘",
-  "result.top3[].score":       "比分榜 {n} · 比分",
-  "result.top3[].prob":        "比分榜 {n} · 概率",
-  "result.llm.win":            "LLM 胜平负",
-  "result.llm.win_pct":        "LLM 胜平负信心",
-  "result.llm.score":          "LLM 比分候选",
-  "result.llm.handicap_num":   "LLM 让球数",
-  "result.llm.handicap_team":  "LLM 让球方向",
-  "result.llm.handicap_pct":   "LLM 让球信心",
-  "result.llm.ou_line":        "LLM 大小球盘口",
-  "result.llm.ou_type":        "LLM 大小球方向",
-  "result.llm.ou_pct":         "LLM 大小球信心",
-  "result.llm.brief_analysis": "LLM 简报",
-  "result.llm.core_data":      "LLM 核心数据",
-  "result.llm.deep_report":    "LLM 深度报告",
-  "result.llm.injuries":       "伤停（喂给模型的原文）",
-  "result.llm.lineups":        "首发（喂给模型的原文）",
-  // —— 没跑过预测时退回的那份（GET /api/sfc/matches 的 pred/llm/book 三块）——
-  "pred.model_group":          "模型分组",
-  "pred.prob.home":            "主胜概率",
-  "pred.prob.draw":            "平局概率",
-  "pred.prob.away":            "客胜概率",
-  "pred.lambda.home":          "主队期望进球 λ",
-  "pred.lambda.away":          "客队期望进球 λ",
-  "pred.top3[].score":         "比分榜 {n} · 比分",
-  "pred.top3[].prob":          "比分榜 {n} · 概率",
-  "pred.handicap":             "让球盘",
-  "pred.at":                   "预测时刻",
-  "llm.win":                   "LLM 胜平负",
-  "llm.win_pct":               "LLM 胜平负信心",
-  "llm.score":                 "LLM 比分候选",
-  "llm.injuries":              "伤停（喂给模型的原文）",
-  "llm.lineups":               "首发（喂给模型的原文）",
-  "book.bookmaker":            "庄家公司",
-  "book.snapshot":             "赔率快照日",
-  "book.bet":                  "玩法",
-  "book.line":                 "盘口线",
-  "book.h":                    "庄家主胜赔率",
-  "book.d":                    "庄家平局赔率",
-  "book.a":                    "庄家客胜赔率",
-  "book.payback":              "庄家返还率",
-  // devig 的下标顺序是 h/d/a（与 book.h/d/a 同序），不是比分榜那种 1/2/3
-  "book.devig[]":              ["庄家主胜去水", "庄家平局去水", "庄家客胜去水"],
-};
-
-/* 右列的值里只有三个是外文/代号，翻掉；其余（Pinnacle、09-28、2-2、L_113）
-   是标识符或日期，翻了反而跟下面那份原始 JSON 对不上。 */
-const SFC_VAL = {
-  "status":             { ok: "成功", error: "失败" },
-  "book.bet":           { "1x2": "胜平负", ah: "亚盘" },
-  "result.model_group": { GLOBAL: "全库兜底" },
-  "pred.model_group":   { GLOBAL: "全库兜底" },
-};
-
-/* 把一个叶子路径翻成中文列名。返回 [显示名, 是否是翻过的]：
-   没翻过的那条要原样显示路径 —— 也正因如此，翻过的那些才需要把原路径塞进 title，
-   不然「后端加个字段自动出现」这条线就断了（对不上原始 JSON 是哪一行）。 */
-function sfcLabel(path) {
-  const hits = [];
-  const norm = path.replace(/\[(\d+)\]/g, (_, i) => (hits.push(+i), "[]"));
-  let label = SFC_LABEL[norm];
-  if (label === undefined) return [path, false];
-  if (Array.isArray(label)) {
-    label = label[hits.length ? hits[hits.length - 1] : -1];
-    if (label === undefined) return [path, false];   // 下标越界 → 退回原路径
-  } else if (label.includes("{n}")) {
-    label = label.replace(/\{n\}/g, () => String((hits.shift() ?? 0) + 1));
-  }
-  return [label, true];
-}
-
-function sfcVal(path, v) {
-  const m = SFC_VAL[path.replace(/\[\d+\]/g, "[]")];
-  const t = m && m[v];
-  return t === undefined ? v : t;   // 认不出就原样，别把陌生值吃掉
-}
-
-/* 这一格该显示哪一份原始数据。跑过就用 POST 的那份，没跑过退回列表接口的三块。 */
-function sfcDetailOf(fid) {
-  const r = sfc.raw[fid];
-  if (r) return r;
-  const m = ((sfc.payload || {}).matches || []).find(x => x.fixture_id === fid);
-  if (!m) return null;
-  return { src: "GET /api/sfc/matches", at: "", data: { pred: m.pred, llm: m.llm, book: m.book } };
-}
-
-function placeSfcPop(cell) {
-  const el = SFC_POP.el, r = cell.getBoundingClientRect();
-  const w = el.offsetWidth, h = el.offsetHeight;
-  // 先试「贴格子右边、上边对齐」，右边放不下就翻到左边；再对两条边夹取，
-  // 保证再窄的窗口也整块可见（夹取后可能盖住格子，那也比露到屏幕外强）。
-  const pad = 8;
-  let x = r.right + pad;
-  if (x + w > innerWidth - pad) x = r.left - w - pad;
-  x = Math.max(pad, Math.min(x, innerWidth - w - pad));
-  let y = Math.min(r.top, innerHeight - h - pad);
-  y = Math.max(pad, Math.min(y, innerHeight - h - pad));
-  el.style.left = x + "px";
-  el.style.top = y + "px";
-}
-
-function openSfcPop(fid, cell) {
-  const d = sfcDetailOf(fid);
-  if (!d) return;
-  SFC_POP.t.innerHTML = `<b>#${esc(fid)}</b> · ${esc(d.src)}` +
-    (d.at ? ` · ${esc(d.at)}` : "") +
-    (d.err ? ` · <span style="color:var(--bad)">失败</span>` : "");
-
-  let inner = "";
-  // 失败的那次：把状态码和后端给的原因单摆一行，再照常把完整响应体铺开 ——
-  // 502 的 body 里就是原因本身，不铺出来等于让人去翻日志。
-  if (d.err) {
-    inner += `<table>
-      <tr><td class="k">HTTP</td><td class="v">${esc(d.err.status ?? "–")}</td></tr>
-      <tr><td class="k">原因</td><td class="v">${esc(d.err.detail ?? "–")}</td></tr>
-      <tr><td class="k">耗时</td><td class="v">${esc(d.err.ms ?? "–")} ms</td></tr>
-    </table>`;
-  }
-  const rows = flatRows(d.data === undefined ? null : d.data, "", []);
-  inner += `<table>` + rows.map(([k, v]) => {
-    const [name, cn] = sfcLabel(k);
-    // 翻过的把原路径挂 title：中文名是给人读的，路径是给「跟原始 JSON 对行」用的。
-    // 没翻过的本来就在显示路径，不用重复挂。
-    return `<tr><td class="k"${cn ? ` title="${esc(k)}"` : ""}>${esc(name)}</td>` +
-           `<td class="v">${esc(sfcVal(k, v))}</td></tr>`;
-  }).join("") + `</table>`;
-
-  // 拍平成表是为了好读，但表终究是我加工过的一道手；原始 JSON 才是「接口返回的全部信息」
-  // 本身（顺序、嵌套都在）。两个都给，谁也不用信谁。
-  let raw;
-  try { raw = JSON.stringify(d.data, null, 2); } catch (_) { raw = "(无法序列化)"; }
-  inner += `<details><summary>原始 JSON（${rows.length} 个叶子字段）</summary>
-    <pre>${esc(raw)}</pre></details>`;
-
-  SFC_POP.b.innerHTML = inner;
-  SFC_POP.el.classList.add("on");     // 先显示再量尺寸：offsetWidth 要布局后才有值
-  sfcPopFid = fid;
-  sfcPopKey = sfc.raw[fid] || "payload";
-  placeSfcPop(cell);
-}
-
-function closeSfcPop() {
-  if (sfcPopFid === null) return;
-  SFC_POP.el.classList.remove("on");
-  sfcPopFid = null;
-  sfcPopKey = null;
-}
-
-SFC_POP.el.querySelector(".px").onclick = () => closeSfcPop();
-
-/* 点「接口预测」格 → 展开这一场的完整接口返回；再点同一格收起。
-   格子里还有 a.jump（跳到预测页）和 a[data-rerun]（重跑），点到它们时让各自的 handler 干活 ——
-   不做这个 early return 的话，点「重跑」会顺手把浮层也弹出来。 */
-$("#sfc-out").addEventListener("click", ev => {
-  if (ev.target.closest("a")) return;
-  const td = ev.target.closest("td[data-detail]");
-  if (!td) return;
-  const tr = td.closest("tr[data-fid]");
+  const tr = entry.closest("tr[data-fid]");
   const fid = tr && parseInt(tr.dataset.fid, 10);
-  if (!fid) return;
-  if (sfcPopFid === fid) { closeSfcPop(); return; }
-  openSfcPop(fid, td);
+  const m = fid && ((sfc.payload || {}).matches || []).find(x => x.fixture_id === fid);
+  if (m) toggleSfcFull(tr, m);
 });
-
-/* 🔴 关闭只能用 mousedown，不能用 click。打开是 #sfc-out 上的 click 委托，同一次点击两个
-   handler 都会跑；而 mousedown 一定早于 click —— 用 click 关就是「先开→后关」，
-   浮层永远打不开。用 mousedown 天然是「关旧的→（紧接着）开新的」，切格子不用特判。
-   target 落在格子上时不关：那是上面那个委托的活（它自己会判断是切换还是收起）。 */
-document.addEventListener("mousedown", ev => {
-  if (sfcPopFid === null) return;
-  if (ev.target.closest("#sfc-pop")) return;         // 点浮层内部（滚动/选字）不算失焦
-  if (ev.target.closest("td[data-detail]")) return;  // 点格子交给 open 那边切
-  closeSfcPop();
-}, true);
-
-document.addEventListener("keydown", ev => {
-  if (ev.key === "Escape") closeSfcPop();
-});
-
-// 浮层是 position:fixed，页面一滚就跟格子错位了；改窗口大小则可能整块压到屏幕外。
-// 与其重算位置，不如直接收掉 —— 用户再点一下的成本比重算错位的成本低。
-//
-// 🔴 必须排除【浮层内部自己】的滚动，否则这个功能是废的：`.pb` 是 overflow:auto，
-// 28 个字段铺开有 790px 上下、可视区只有 540px —— deep_report / core_data 那些长文本
-// 不滚动根本看不到，而元素上的 scroll 事件【同样会被 window 的 capture 监听收到】
-// （capture 阶段不看 bubbles:false，实测滚一次 window 就收到 1 次）。
-// 不判断滚动源的话，用户一滚浮层立刻消失。
-// document 滚动时 ev.target 是 document（nodeType 9，没有 closest）→ 落到下面正常关闭。
-window.addEventListener("scroll", ev => {
-  const t = ev.target;
-  if (t && t.nodeType === 1 && t.closest("#sfc-pop")) return;
-  closeSfcPop();
-}, true);
-window.addEventListener("resize", () => closeSfcPop());
 
 /* 存档本期。打开本页时【已经自动存过一次】了（后端 120 秒防抖），这个按钮是手动补一炮：
    跑完 14 场预测之后想让快照记上刚跑的值，或者不放心自动那次有没有走到。
@@ -1951,7 +1692,7 @@ $("#sfc-archive").onclick = async () => {
 async function runOneSfcPredict(fid) {
   const token = localStorage.getItem("token");
   if (!token) {
-    location.href = "/login.html?v=7";
+    location.href = "/login.html?v=11";
     return false;
   }
   const at = "跑于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -1992,9 +1733,8 @@ async function rerunOneSfc(fid) {
     await loadSfc(true);
   } else {
     patchSfcPred(fid);
-    // 点击检查之后、请求到达之前会员正好到期：服务端 403，这里补上续费弹框
-    const kind = memberGateKind(sfc.st[fid]);
-    if (kind) showPayModal(kind);
+    // 点击检查之后、请求到达之前会员正好到期：服务端 403，去个人中心重新开通
+    if (memberGateKind(sfc.st[fid])) { location.href = "/center.html"; return; }
   }
 }
 
@@ -2012,7 +1752,7 @@ async function runSfcPredict() {
   // 未登录提示，不跳转
   const token = localStorage.getItem("token");
   if (!token) {
-    location.href = "/login.html?v=7";
+    location.href = "/login.html?v=11";
     return;
   }
   // 先弹窗提示
@@ -2037,7 +1777,7 @@ async function doSfcPredict() {
   $$("tr[data-fid]", $("#sfc-out")).forEach(tr => {
     const fid = parseInt(tr.dataset.fid, 10);
     const cell = $(".pd-cell", tr);
-    if (cell && sfc.st[fid] === "loading") cell.innerHTML = predCell(null, null, "loading");
+    if (cell && sfc.st[fid] === "loading") cell.innerHTML = predCell(null, "loading");
   });
 
   const total = fids.length;
@@ -2049,7 +1789,7 @@ async function doSfcPredict() {
 
   // 🔴 整段包 try/finally：锁必须在 finally 里放。
   // 单场失败已经由 runOneSfcPredict 内部接住了，但 Promise.all 里还有 patchSfcPred ——
-  // 它要写 DOM、要 syncSfcPop，任何一处意外抛出都会让 Promise.all reject，
+  // 它要写 DOM，任何一处意外抛出都会让 Promise.all reject，
   // 于是 sfc.running 卡在 true、按钮永远 disabled，**只能刷新页面才能再跑**。
   // 这页是当天的主力工作台，卡死一次代价太大，宁可多了个 try。
   try {
@@ -2067,9 +1807,9 @@ async function doSfcPredict() {
     fids.forEach(fid => { if (!(sfc.st[fid] instanceof Error)) delete sfc.st[fid]; });
 
     // 会员在批量跑到一半到期：剩下的场次服务端全部 403（在调用 LLM 之前就拦掉，不花钱），
-    // 但格子上只会显示「跑失败」。这里统一弹一次续费框，别让用户对着 14 个红字猜原因。
+    // 但格子上只会显示「跑失败」。统一去个人中心重新开通，别让用户对着 14 个红字猜原因。
     const gateKind = fids.map(fid => memberGateKind(sfc.st[fid])).find(Boolean);
-    if (gateKind) showPayModal(gateKind);
+    if (gateKind) { location.href = "/center.html"; return; }
 
     // 全部跑完再拉一次接口：庄家盘 / 体彩盘 / 水 也顺便跟着刷新，at 换回后端的 updated_at
     btn.textContent = "刷新中…";
@@ -2091,15 +1831,18 @@ function patchSfcPred(fid) {
   const cell = tr && $(".pd-cell", tr);
   if (cell) {
     const s = sfc.st[fid];
-    if (s === "loading") cell.innerHTML = predCell(null, null, "loading");
-    else if (s instanceof Error) cell.innerHTML = predCell(null, null, s);
-    else cell.innerHTML = predCell(s.pred, s.llm, null);
+    const m = ((sfc.payload || {}).matches || []).find(x => x.fixture_id === fid);
+    const canFull = !!(m && sfcFullRecord(m));
+    if (s === "loading") cell.innerHTML = predCell(null, "loading");
+    else if (s instanceof Error) cell.innerHTML = predCell(null, s);
+    else {
+      // 单场先跑完也立刻给「完整预测」入口，不用等整批结束重画表格。
+      cell.innerHTML = predCell(s.pred, null) + (canFull ? sfcFullLink() : "");
+    }
+    // 整格可点：单场跑完时也要同步，不然只有链接能点，点旁边没反应。
+    if (canFull && s !== "loading" && !(s instanceof Error)) cell.dataset.fullCell = "1";
+    else delete cell.dataset.fullCell;
   }
-  // 格子换了内容就会长高或变矮，锚在它旁边的浮层得跟着挪；
-  // 数据指纹变了还会顺带重铺内容（「重跑」失败那条路只走 patchSfcPred、不走 renderSfc，
-  // 少了这一句浮层就会一直显示上一次的旧原因）。
-  // 放在最后、不跟着上面两个 return 走 —— 找不到格子时恰恰更需要它去把浮层收掉。
-  syncSfcPop();
 }
 
 $("#sfc-run").onclick = () => runSfcPredict();
@@ -2111,7 +1854,7 @@ let predicting = false;   // 在途锁：按钮 disabled 挡不住回车键
 async function runPredict() {
   if (predicting) return;   // 一次预测 = 一次 LLM 调用(花钱) + 一次写库，不能重入
   const me = await window.ensureMember();
-  if (!me) return;          // 未登录 → 登录框；未开会员 → 支付框
+  if (!me) return;          // 未登录 → 登录页；未开会员 → 个人中心充值页
   const fid = parseInt($("#fid").value, 10);
   const out = $("#predict-out");
   if (!fid) { out.innerHTML = `<div class="err">请先填写 fixture_id</div>`; return; }
@@ -2144,9 +1887,8 @@ async function runPredict() {
   } catch (e) {
     showNet(`POST /api/predict/${fid} · 失败`);
     out.innerHTML = `<div class="err">预测失败\n${esc(e.message)}</div>`;
-    // 点击检查之后、请求到达之前会员到期：补上续费弹框，别只留一行 HTTP 403
-    const kind = memberGateKind(e);
-    if (kind) showPayModal(kind);
+    // 点击检查之后、请求到达之前会员到期：去个人中心重新开通，别只留一行 HTTP 403
+    if (memberGateKind(e)) { location.href = "/center.html"; return; }
   } finally {
     clearInterval(ticker);
     predicting = false;
@@ -2234,7 +1976,7 @@ async function loadHistory(page) {
     // 401=没登录（历史现在要求登录，免费注册即可看）；403=没会员（如后续收紧）
     if (e.status === 401) {
       out.innerHTML = `<div class="empty">登录后可查看预测记录<br>
-        <a href="/login.html?v=7">去登录</a> · <a href="/login.html?v=7#register">免费注册</a></div>`;
+        <a href="/login.html?v=11">去登录</a> · <a href="/login.html?v=11#register">免费注册</a></div>`;
     } else if (e.status === 403) {
       out.innerHTML = `<div class="empty">开通会员后可查看预测记录<br>
         <a href="/center.html">去个人中心开通</a></div>`;
@@ -2308,7 +2050,7 @@ async function loadSfcHistory(seq) {
     if (seq !== historySeq) return;
     if (e.status === 401) {
       out.innerHTML = `<div class="empty">登录后可查看胜负彩复盘<br>
-        <a href="/login.html?v=7">去登录</a> · <a href="/login.html?v=7#register">免费注册</a></div>`;
+        <a href="/login.html?v=11">去登录</a> · <a href="/login.html?v=11#register">免费注册</a></div>`;
     } else {
       out.innerHTML = `<div class="err">加载失败\n${esc(e.message)}</div>`;
     }
@@ -2621,7 +2363,7 @@ window.checkAuth = async function checkAuth() {
   return null;
 }
 function requireLogin() {
-  location.href = "/login.html?v=7";
+  location.href = "/login.html?v=11";
   return false;
 }
 /* kind: "expired" = 开过会员但已到期，需续费；"open" = 从未开通；空 = 通用支付框 */
@@ -2640,16 +2382,13 @@ function showPayModal(kind) {
   }
   document.getElementById("pay-modal").style.display = "flex";
 }
-/* 预测类功能的统一门槛：没登录 → 登录框；登录了但没会员 → 支付框。
-   expires_at 有值说明开过会员（周卡/月卡等），已经过期就提示续费，而不是只说「请扫码支付」。
-   返回 me 表示放行，返回 null 表示已弹窗拦截。 */
+/* 预测类功能的统一门槛：没登录 → 登录页；登录了但没会员 → 个人中心充值页。
+   2026-11-25 用户口径：非会员点「预测比赛」直接跳个人中心整页（有套餐和到期时间），
+   不再弹支付宝扫码框。返回 me 表示放行，返回 null 表示已跳转/拦截。 */
 window.ensureMember = async function ensureMember() {
   const me = await checkAuth();
   if (!me) { requireLogin(); return null; }
-  if (!me.is_member) {
-    showPayModal(me.expires_at ? "expired" : "open");
-    return null;
-  }
+  if (!me.is_member) { location.href = "/center.html"; return null; }
   return me;
 };
 
@@ -2739,15 +2478,15 @@ document.getElementById("btn-close-login").onclick = () => {
   document.getElementById("login-modal").style.display = "none";
 };
 document.getElementById("btn-login").onclick = () => {
-  location.href = "/login.html?v=7";
+  location.href = "/login.html?v=11";
 };
 // login-page 那套没有配套的登录逻辑（登录要验证码），登录按钮统一指到 /login.html。
 // 注意：#login-page 的 DOM 在这段脚本之后才解析，必须用事件委托，不能直接 getElementById
 document.addEventListener("click", ev => {
-  if (ev.target.closest("#btn-do-login")) location.href = "/login.html?v=7";
+  if (ev.target.closest("#btn-do-login")) location.href = "/login.html?v=11";
 });
 document.getElementById("btn-register").onclick = () => {
-  location.href = "/login.html?v=7#register";
+  location.href = "/login.html?v=11#register";
 };
 
 // 拦截需要登录的按钮
@@ -2844,7 +2583,7 @@ setInterval(loadTicker, 5 * 60 * 1000);
 }
 </style>
 
-    <img id="alipay-qr" src="/alipay-qr.png" alt="支付宝收款码" style="width:220px;height:220px;background:#333;border-radius:8px;">
+    <img id="alipay-qr" src="/alipay-qr.png?v=2" alt="支付宝收款码" style="width:220px;height:220px;background:#333;border-radius:8px;">
     <p style="margin:12px 0;font-size:14px;color:var(--dim)">支付完成后请稍等<br>或联系管理员激活</p>
     <p style="font-size:12px;color:var(--warn)">联系方式见上方二维码</p>
     <button class="ghost" id="btn-close-pay" style="margin-top:12px;width:100%" onclick="document.getElementById('pay-modal').style.display='none'">我已支付，关闭</button>
@@ -3078,7 +2817,7 @@ async function refreshUserIcon() {
       if (a) { a.textContent = "开通会员"; a.href = "/center.html"; }
       if (txt) txt.textContent = "已登录；开通会员后即可运行完整预测、保存赛前快照并查看赛后复盘。";
     } else {
-      if (a) { a.textContent = "注册 / 开通会员"; a.href = "/login.html?v=7#register"; }
+      if (a) { a.textContent = "注册 / 开通会员"; a.href = "/login.html?v=11#register"; }
       if (txt) txt.textContent = "游客可浏览盘口；注册并开通会员后解锁完整预测、赛前存档与赛后复盘。";
     }
   });
@@ -3101,7 +2840,7 @@ document.getElementById("dd-center")?.addEventListener("click", () => {
 });
 document.getElementById("dd-logout")?.addEventListener("click", () => {
   localStorage.removeItem("token");
-  location.href = "/login.html?v=7";
+  location.href = "/login.html?v=11";
 });
 
 // 确保个人中心按钮可点
@@ -3292,7 +3031,7 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
   if(logout){
     logout.onclick = function(){
       localStorage.removeItem("token");
-      location.href = "/login.html?v=7";
+      location.href = "/login.html?v=11";
     };
   }
 })();
@@ -3314,9 +3053,31 @@ document.getElementById("btn-user-center")?.addEventListener("click", () => {
       try {
         if(token) await fetch("/api/auth/logout", {method:"POST", headers:{Authorization:"Bearer "+token}});
       } catch(e) {}
-      location.href = "/login.html?v=7";
+      location.href = "/login.html?v=11";
     };
   }
+  // 手机端：退出按钮跟「个人中心」同一行、放它右边；PC 端留在原来的 user-icon-area。
+  // 只搬 DOM，不动按钮本身的显隐逻辑（updateLogout 继续管 display）。
+  var nav = document.querySelector("header nav");
+  var area = document.getElementById("user-icon-area");
+  var dd = document.getElementById("user-dropdown");
+  var mq = window.matchMedia("(max-width: 480px)");
+  function placeLogout() {
+    if (!logoutBtn || !nav || !area || !dd) return;
+    if (mq.matches) {
+      nav.appendChild(logoutBtn);
+      logoutBtn.style.marginLeft = "2px";
+      area.style.display = "none";
+    } else {
+      area.style.display = "";
+      area.insertBefore(logoutBtn, dd);
+      logoutBtn.style.marginLeft = "8px";
+    }
+  }
+  placeLogout();
+  if (mq.addEventListener) mq.addEventListener("change", placeLogout);
+  else if (mq.addListener) mq.addListener(placeLogout);
+
   // also check periodically in case token changes
   setInterval(updateLogout, 2000);
 })();
@@ -3369,7 +3130,7 @@ document.addEventListener("click", async function(e) {
   btn.dataset.busy = "1";
   const token = localStorage.getItem("token");
   if (!token) {
-    location.href = "/login.html?v=7";
+    location.href = "/login.html?v=11";
     return;
   }
   // 检查会员状态
@@ -3434,9 +3195,8 @@ async function doPredict(btn, fid) {
       row.querySelector("td").innerHTML =
         `<div class="err">预测失败\n${esc(msg)}</div>`;
     }
-    // 会员在「点击检查」和「请求到达」之间到期：服务端 403，弹续费框而不是通用提示框
-    const gate = memberGateKind(err);
-    if (gate) showPayModal(gate);
+    // 会员在「点击检查」和「请求到达」之间到期：服务端 403，去个人中心重新开通
+    if (memberGateKind(err)) location.href = "/center.html";
     else showModal(msg);
   } finally {
     delete btn.dataset.running;
@@ -3572,8 +3332,9 @@ document.getElementById("adm-users")?.addEventListener("click", ev => {
     });
     // Rebind click handlers
     nav.querySelectorAll("button[data-tab]").forEach(b => {
-      b.onclick = () => {
+      b.onclick = async () => {
         trackClick("菜单：" + b.textContent.trim());
+        if (b.dataset.tab === "predict" && !(await window.ensureMember())) return;
         switchTab(b.dataset.tab);
       };
     });

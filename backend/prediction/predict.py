@@ -15,6 +15,7 @@ import json
 import pickle
 import re
 import threading
+import time
 from datetime import datetime
 
 from prediction.errors import PredictError   # 失败要带原因，别让调用方只拿到 None
@@ -34,7 +35,7 @@ from loguru import logger
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 from app.db.session import SessionLocal
 from app.core.config import settings
 from prediction.features import extract_features_for_fixture
@@ -493,9 +494,304 @@ _INJ_TYPE_ZH = {"Injured": "伤停", "Suspended": "停赛",
                 "Missing Fixture": "缺阵", "Questionable": "存疑"}
 _INJ_STATUS_ZH = {"Out": "缺席", "Doubtful": "存疑", "Questionable": "存疑"}
 
+# 进程内球员中文名缓存（英文名 -> 中文名）。DB 里有的优先用 DB，
+# 这里只兜底「players 表没有这名球员」的情况，省掉同一进程内重复调 LLM。
+_NAME_ZH_MEM: dict[str, str] = {}
+# 球队中文名缓存，同理
+_TEAM_ZH_MEM: dict[str, str] = {}
+# 球队球衣号码缓存 team_id -> (拉取时间, {player_id: number})，6 小时够用
+_SQUAD_CACHE: dict[int, tuple[float, dict[int, int]]] = {}
+_SQUAD_TTL = 6 * 3600
+
+
+def _load_name_zh_from_db(pids: list[int]) -> dict[int, str]:
+    """按 API 球员 id 查 players.name_zh（已有中文名的走这条，不再翻译）。"""
+    if not pids:
+        return {}
+    db = None
+    try:
+        db = SessionLocal()
+        rows = db.execute(
+            text("select id, name_zh from players where id in :ids")
+            .bindparams(bindparam("ids", expanding=True)),
+            {"ids": pids},
+        ).fetchall()
+        return {int(r[0]): str(r[1]).strip() for r in rows
+                if r[1] and str(r[1]).strip()}
+    except Exception as e:
+        logger.debug(f"球员中文名查询失败: {e}")
+        return {}
+    finally:
+        if db is not None:
+            db.close()
+
+
+def _save_player_name_zh(updates: dict[int, str]) -> None:
+    """把新翻译出的中文名写回 players.name_zh，只填空值，不覆盖已有译名。"""
+    if not updates:
+        return
+    db = None
+    try:
+        db = SessionLocal()
+        for pid, zh in updates.items():
+            db.execute(
+                text("update players set name_zh=:zh "
+                     "where id=:id and (name_zh is null or name_zh='')"),
+                {"zh": zh, "id": pid},
+            )
+        db.commit()
+    except Exception as e:
+        logger.debug(f"球员中文名缓存失败: {e}")
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    finally:
+        if db is not None:
+            db.close()
+
+
+def _load_team_name_zh(tids: list[int]) -> dict[int, str]:
+    if not tids:
+        return {}
+    db = None
+    try:
+        db = SessionLocal()
+        rows = db.execute(
+            text("select id, name_zh from teams where id in :ids")
+            .bindparams(bindparam("ids", expanding=True)),
+            {"ids": tids},
+        ).fetchall()
+        return {int(r[0]): str(r[1]).strip() for r in rows
+                if r[1] and str(r[1]).strip()}
+    except Exception as e:
+        logger.debug(f"球队中文名查询失败: {e}")
+        return {}
+    finally:
+        if db is not None:
+            db.close()
+
+
+def _save_team_name_zh(updates: dict[int, str]) -> None:
+    """把新翻译出的球队中文名写回 teams.name_zh，只填空值。"""
+    if not updates:
+        return
+    db = None
+    try:
+        db = SessionLocal()
+        for tid, zh in updates.items():
+            db.execute(
+                text("update teams set name_zh=:zh "
+                     "where id=:id and (name_zh is null or name_zh='')"),
+                {"zh": zh, "id": tid},
+            )
+        db.commit()
+    except Exception as e:
+        logger.debug(f"球队中文名缓存失败: {e}")
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    finally:
+        if db is not None:
+            db.close()
+
+
+def _translate_names_once(wanted: list[str], entity: str = "球员",
+                          mem: dict | None = None) -> dict[str, str]:
+    """一次 DeepSeek 调用翻一批名字；失败只影响这一批。"""
+    mem = _NAME_ZH_MEM if mem is None else mem
+    try:
+        import httpx
+        extra = ("不要保留名字里的首字母缩写（例如 A. McCarthy 只写「麦卡锡」，"
+                 "不要写「A. 麦卡锡」）；" if entity == "球员" else "")
+        prompt = (
+            f"你是足球译名助手。把下面 JSON 数组里的{entity}英文名翻译成简体中文常用译名"
+            "（以懂球帝、直播吧等国内媒体的习惯叫法为准）。"
+            "只输出一个 JSON 对象：键必须与原文完全一致，值只写中文译名；"
+            + extra +
+            "不要解释，不要 markdown，不要输出其他内容。无法确定的名字按读音音译。\n"
+            + json.dumps(wanted, ensure_ascii=False)
+        )
+        resp = httpx.post(
+            f"{settings.deepseek_base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.deepseek_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.deepseek_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+                "max_tokens": 1200,
+                "thinking": {"type": "disabled"},
+            },
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        content = resp.json()["choices"][0]["message"]["content"]
+        parsed = _parse_llm_json(content)
+        out: dict[str, str] = {}
+        if isinstance(parsed, dict):
+            for k, v in parsed.items():
+                if k not in wanted or not isinstance(v, str):
+                    continue
+                zh = re.sub(r"^(?:[A-Za-z]\.\s*)+", "", v.strip()).strip()
+                # 只接受真的含中文的译名，防止模型原样回英文
+                if zh and zh != k and re.search(r"[一-鿿]", zh):
+                    out[k] = zh
+                    mem[k] = zh
+        return out
+    except Exception as e:
+        logger.warning(f"伤停{entity}名翻译失败: {e}")
+        return {}
+
+
+def _translate_player_names(names: list[str]) -> dict[str, str]:
+    """英文球员名批量译成中文。失败返回 {}，调用方保留英文。"""
+    wanted: list[str] = []
+    for raw in names:
+        s = " ".join(str(raw or "").split())
+        if not s or s in wanted or s in _NAME_ZH_MEM:
+            continue
+        # 已经是中文，或者没有拉丁字母的，不用翻
+        if not re.search(r"[A-Za-z]", s) or re.search(r"[一-鿿]", s):
+            continue
+        wanted.append(s)
+    if not wanted:
+        return {}
+    out: dict[str, str] = {}
+    # 一次别塞太多，否则 JSON 返回会被 max_tokens 截断
+    for i in range(0, len(wanted), 40):
+        out.update(_translate_names_once(wanted[i:i + 40]))
+    logger.info(f"伤停球员名翻译: {len(out)}/{len(wanted)}")
+    return out
+
+
+def _resolve_player_names(entries: list[dict]) -> dict[int, str]:
+    """返回 player_id -> 中文名；DB 缺译名的批量翻译一次并回写。"""
+    by_pid: dict[int, str] = {}
+    for e in entries:
+        try:
+            pid = int(e.get("pid"))
+        except (TypeError, ValueError):
+            continue
+        name = str(e.get("name") or "").strip()
+        if pid and name:
+            by_pid[pid] = name
+    if not by_pid:
+        return {}
+
+    zh = _load_name_zh_from_db(sorted(by_pid))
+    missing = [pid for pid in by_pid if pid not in zh]
+    if not missing:
+        return zh
+
+    # 先吃进程内缓存，再一次性翻译剩下没见过的
+    translated = {by_pid[pid]: _NAME_ZH_MEM[by_pid[pid]]
+                  for pid in missing if by_pid[pid] in _NAME_ZH_MEM}
+    need = [by_pid[pid] for pid in missing if by_pid[pid] not in translated]
+    translated.update(_translate_player_names(need))
+
+    updates: dict[int, str] = {}
+    for pid in missing:
+        z = translated.get(by_pid[pid])
+        if z:
+            zh[pid] = z
+            updates[pid] = z
+    _save_player_name_zh(updates)
+    return zh
+
+
+def _translate_team_names(names: list[str]) -> dict[str, str]:
+    """英文球队名批量译成中文。失败返回 {}，调用方保留英文。"""
+    wanted: list[str] = []
+    for raw in names:
+        s = " ".join(str(raw or "").split())
+        if not s or s in wanted or s in _TEAM_ZH_MEM:
+            continue
+        if not re.search(r"[A-Za-z]", s) or re.search(r"[一-鿿]", s):
+            continue
+        wanted.append(s)
+    if not wanted:
+        return {}
+    out: dict[str, str] = {}
+    for i in range(0, len(wanted), 40):
+        out.update(_translate_names_once(wanted[i:i + 40], entity="球队", mem=_TEAM_ZH_MEM))
+    logger.info(f"伤停球队名翻译: {len(out)}/{len(wanted)}")
+    return out
+
+
+def _resolve_team_names(names_by_tid: dict[int, str]) -> dict[int, str]:
+    """返回 team_id -> 中文队名；DB 缺译名的批量翻译一次并回写。"""
+    pairs = {int(tid): str(name).strip() for tid, name in names_by_tid.items()
+             if tid is not None and name and str(name).strip()}
+    if not pairs:
+        return {}
+    zh = _load_team_name_zh(sorted(pairs))
+    missing = {tid: name for tid, name in pairs.items() if tid not in zh}
+    if not missing:
+        return zh
+
+    translated = {name: _TEAM_ZH_MEM[name] for name in missing.values()
+                  if name in _TEAM_ZH_MEM}
+    need = [name for name in missing.values() if name not in translated]
+    translated.update(_translate_team_names(need))
+
+    updates: dict[int, str] = {}
+    for tid, name in missing.items():
+        z = translated.get(name)
+        if z:
+            zh[tid] = z
+            updates[tid] = z
+    _save_team_name_zh(updates)
+    return zh
+
+
+def _fetch_squad_numbers(team_id) -> dict[int, int]:
+    """/injuries 不返回球衣号码，只能从 /players/squads 取当前名单号码。"""
+    try:
+        tid = int(team_id)
+    except (TypeError, ValueError):
+        return {}
+    now = time.time()
+    hit = _SQUAD_CACHE.get(tid)
+    if hit and now - hit[0] < _SQUAD_TTL:
+        return hit[1]
+    try:
+        import httpx
+        r = httpx.get(
+            f"{settings.api_football_base_url}/players/squads",
+            headers={"x-apisports-key": settings.api_football_key},
+            params={"team": tid},
+            timeout=10.0,
+            trust_env=False,
+        )
+        r.raise_for_status()
+        numbers: dict[int, int] = {}
+        for entry in r.json().get("response") or []:
+            for p in entry.get("players") or []:
+                pid, num = p.get("id"), p.get("number")
+                try:
+                    if pid is not None and num not in (None, ""):
+                        numbers[int(pid)] = int(num)
+                except (TypeError, ValueError):
+                    continue
+        _SQUAD_CACHE[tid] = (now, numbers)
+        return numbers
+    except Exception as e:
+        logger.debug(f"球衣号码获取失败 team={team_id}: {e}")
+        return {}
+
 
 def _fetch_injuries_text(fixture_id: int, home_id: int, away_id: int) -> str:
-    """拉取该场比赛双方伤停/停赛名单，按主客队分组"""
+    """拉取该场比赛双方伤停/停赛名单，按主客队分组。
+
+    显示名优先用 players.name_zh / teams.name_zh（缺失的批量翻译并回写），
+    号码从 /players/squads 取（/injuries 本身不含球衣号码）。
+    """
     try:
         import httpx
         # trust_env=False: 绕开系统代理直连，理由见 app/core/apifootball.py docstring
@@ -513,34 +809,67 @@ def _fetch_injuries_text(fixture_id: int, home_id: int, away_id: int) -> str:
 
         # API 偶尔返回重复条目，按 (team_id, player_id) 去重
         seen: set[tuple] = set()
-        by_team: dict[int, list[str]] = {}
+        by_team: dict[int, list[dict]] = {}
+        team_names: dict[int, str] = {}
         for item in data:
             player = item.get("player") or {}
             team = item.get("team") or {}
             name = player.get("name")
+            tid = team.get("id")
             if not name:
                 continue
-            key = (team.get("id"), player.get("id"))
+            key = (tid, player.get("id"))
             if key in seen:
                 continue
             seen.add(key)
-            typ = player.get("type") or "伤停"
-            reason = player.get("reason") or ""
-            status = player.get("status") or ""
-            parts = [name, _INJ_TYPE_ZH.get(typ, typ)]
-            if reason:
-                parts.append(reason)
-            if status:
-                parts.append(_INJ_STATUS_ZH.get(status, status))
-            by_team.setdefault(team.get("id"), []).append(" - ".join(parts))
+            if team.get("name"):
+                team_names.setdefault(tid, team.get("name"))
+            by_team.setdefault(tid, []).append({
+                "pid": player.get("id"),
+                "name": name,
+                "type": player.get("type") or "伤停",
+                "reason": player.get("reason") or "",
+                "status": player.get("status") or "",
+            })
 
         if not by_team:
             return "该场比赛暂无伤停数据"
 
+        entries = [e for items in by_team.values() for e in items]
+        try:
+            player_zh = _resolve_player_names(entries)
+        except Exception as e:
+            logger.debug(f"伤停球员中文名解析失败，保留英文: {e}")
+            player_zh = {}
+        try:
+            team_zh = _resolve_team_names({tid: team_names.get(tid, "") for tid in by_team})
+        except Exception as e:
+            logger.debug(f"伤停球队中文名解析失败，保留英文: {e}")
+            team_zh = {}
+        # 号码只为真有伤停的球队拉，没伤停的队不白花 API 次数
+        squads = {tid: _fetch_squad_numbers(tid) for tid in by_team}
+
         lines = []
-        for tid, names in by_team.items():
+        for tid, items in by_team.items():
             side = "主队" if tid == home_id else "客队" if tid == away_id else "球队"
-            team_name = next((t.get("name") for t in data if (t.get("team") or {}).get("id") == tid), "")
+            team_name = team_zh.get(tid) or team_names.get(tid, "")
+            numbers = squads.get(tid) or {}
+            names = []
+            for e in items:
+                try:
+                    pid = int(e.get("pid"))
+                except (TypeError, ValueError):
+                    pid = None
+                shown = player_zh.get(pid) if pid is not None else None
+                shown = shown or e["name"]
+                num = numbers.get(pid) if pid is not None else None
+                label = f"#{num} {shown}" if num else shown
+                parts = [label, _INJ_TYPE_ZH.get(e["type"], e["type"])]
+                if e["reason"]:
+                    parts.append(e["reason"])
+                if e["status"]:
+                    parts.append(_INJ_STATUS_ZH.get(e["status"], e["status"]))
+                names.append(" - ".join(parts))
             lines.append(f"{side}{team_name}: " + " | ".join(names))
         return "伤停名单:\n" + "\n".join(lines)
     except Exception as e:
